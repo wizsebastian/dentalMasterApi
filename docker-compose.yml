@@ -1,0 +1,53 @@
+# Stack base de DentalMaster. Sin datos demo: apto para un despliegue real.
+# En desarrollo, docker-compose.override.yml se carga solo y añade el seed demo.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dentalmaster-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dental}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dental}
+      POSTGRES_DB: ${POSTGRES_DB:-odonto}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Postgres ejecuta initdb.d en orden alfabético, sólo la primera vez que
+      # el volumen está vacío. Por eso los archivos conservan su prefijo numérico.
+      # Se montan uno a uno, no el directorio: así el override de desarrollo
+      # puede añadir 03_seed_demo.sql sin chocar con un mount de sólo lectura.
+      - ./db/init/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/init/02_seed_catalogos.sql:/docker-entrypoint-initdb.d/02_seed_catalogos.sql:ro
+      - ./db:/db:ro
+      - dentalmaster-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dental} -d ${POSTGRES_DB:-odonto}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: dentalmaster-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dental}:${POSTGRES_PASSWORD:-dental}@db:5432/${POSTGRES_DB:-odonto}
+      SECRET_KEY: ${SECRET_KEY:-cambiar-en-produccion}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  adminer:
+    image: adminer:latest
+    container_name: dentalmaster-adminer
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  dentalmaster-pgdata:

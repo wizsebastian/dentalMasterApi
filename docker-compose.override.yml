@@ -1,0 +1,16 @@
+# Desarrollo. Compose lo carga automáticamente; un despliegue real usa
+# explícitamente `docker compose -f docker-compose.yml up`.
+services:
+  db:
+    volumes:
+      # Se añade al initdb.d del archivo base: corre después de 01 y 02.
+      - ./db/dev/03_seed_demo.sql:/docker-entrypoint-initdb.d/03_seed_demo.sql:ro
+
+  api:
+    environment:
+      DEBUG: "true"
+      SEED_DEMO_USERS: "true"   # reemplaza los password_hash marcadores del seed
+    volumes:
+      - ./app:/srv/app:ro
+      - ./migrations:/srv/migrations:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
