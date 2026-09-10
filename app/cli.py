@@ -1,6 +1,7 @@
 """Comandos de mantenimiento. Uso: python -m app.cli <comando>"""
 
 import sys
+from getpass import getpass
 
 from alembic import command
 from alembic.config import Config
@@ -9,6 +10,7 @@ from sqlalchemy import select, update
 
 from app.core.security import hash_password
 from app.db.session import SessionLocal, engine
+from app.models.enums import RolUsuario
 from app.models.organizacion import Usuario
 
 # Contraseña única para todos los usuarios del seed demo. Sólo desarrollo:
@@ -65,7 +67,63 @@ def seed_users() -> None:
         print(f"       - {email}")
 
 
-COMMANDS = {"db-baseline": db_baseline, "seed-users": seed_users}
+def crear_usuario() -> None:
+    """Da de alta un usuario real. Uso:
+
+        python -m app.cli crear-usuario <email> <rol> [doctor_id]
+
+    Es la única vía de entrada en producción, donde `seed-users` no corre. La
+    contraseña se pide por consola para que no quede en el historial del shell.
+    """
+    if len(sys.argv) < 4:
+        print(
+            "uso: python -m app.cli crear-usuario <email> "
+            f"<{'|'.join(r.value for r in RolUsuario)}> [doctor_id]",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    email = sys.argv[2].strip().lower()
+    try:
+        rol = RolUsuario(sys.argv[3])
+    except ValueError:
+        print(f"rol inválido: {sys.argv[3]}", file=sys.stderr)
+        raise SystemExit(2) from None
+
+    doctor_id = int(sys.argv[4]) if len(sys.argv) > 4 else None
+
+    password = getpass("Contraseña: ")
+    if len(password) < 12:
+        print("La contraseña debe tener al menos 12 caracteres", file=sys.stderr)
+        raise SystemExit(1)
+    if password != getpass("Repetir: "):
+        print("Las contraseñas no coinciden", file=sys.stderr)
+        raise SystemExit(1)
+
+    with SessionLocal() as db:
+        if db.scalar(select(Usuario).where(Usuario.email == email)):
+            print(f"Ya existe un usuario con el email {email}", file=sys.stderr)
+            raise SystemExit(1)
+
+        db.add(
+            Usuario(
+                email=email,
+                password_hash=hash_password(password),
+                rol=rol,
+                doctor_id=doctor_id,
+                activo=True,
+            )
+        )
+        db.commit()
+
+    print(f"[cli] usuario {email} creado con rol {rol}")
+
+
+COMMANDS = {
+    "db-baseline": db_baseline,
+    "seed-users": seed_users,
+    "crear-usuario": crear_usuario,
+}
 
 
 def main() -> int:

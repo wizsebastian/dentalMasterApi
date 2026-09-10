@@ -31,6 +31,49 @@ Usuarios demo — contraseña `dental2026` para todos:
 
 `make help` lista el resto de comandos.
 
+## Despliegue
+
+Servidor `74.208.173.175` (Ubuntu 24.04), junto a las APIs de GMD y TDI. Cada
+proyecto vive en `~/projects/<nombre>`, escucha sólo en localhost y sale por
+nginx con certificado Let's Encrypt.
+
+| | API | Postgres |
+|---|---|---|
+| GMD | `:8000` | `:5433` |
+| TDI | `:8001` | `:5434` |
+| **DentalMaster** | **`:8002`** | **`:5435`** |
+
+```bash
+ssh deploy@74.208.173.175
+cd ~/projects/dentalmaster-api
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+**`docker-compose.prod.yml` se invoca siempre de forma explícita.** Un
+`docker compose up` a secas carga `docker-compose.override.yml`, que siembra los
+cuatro pacientes de demo: en producción eso sería historia clínica falsa. El
+archivo de producción es autónomo para que ese error no pueda ocurrir, y tampoco
+levanta Adminer.
+
+Primer arranque:
+
+```bash
+cp .env.produccion.example .env      # rellenar POSTGRES_PASSWORD y SECRET_KEY
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec api python -m app.cli crear-usuario \
+    correo@clinica.do admin
+```
+
+`seed-users` no corre en producción, así que `crear-usuario` es la única vía de
+entrada. Pide la contraseña por consola para que no quede en el historial.
+
+Copia de seguridad:
+
+```bash
+docker exec dentalmaster-db pg_dump -U dental odonto > ~/dentalmaster_$(date +%Y%m%d).sql
+```
+
 ## El esquema no lo genera Alembic
 
 Los `.sql` de `db/` son la fuente de verdad del esquema inicial. Postgres los ejecuta por

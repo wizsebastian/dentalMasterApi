@@ -1,0 +1,47 @@
+# Producción. Se invoca EXPLÍCITAMENTE:
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# No basta con omitir el override: `docker compose up` a secas carga
+# docker-compose.override.yml, que siembra los pacientes de demo. Este archivo
+# es autónomo para que ese error no pueda ocurrir.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dentalmaster-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dental}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-odonto}
+    ports:
+      # Sólo localhost: nginx es la única puerta de entrada.
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - ./db/init/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/init/02_seed_catalogos.sql:/docker-entrypoint-initdb.d/02_seed_catalogos.sql:ro
+      - ./db:/db:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dental} -d ${POSTGRES_DB:-odonto}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: dentalmaster-api
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+    ports:
+      - "127.0.0.1:8002:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dental}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-odonto}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
