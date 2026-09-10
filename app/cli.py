@@ -67,6 +67,80 @@ def seed_users() -> None:
         print(f"       - {email}")
 
 
+MIN_PASSWORD = 12
+
+
+def revisar_password(password: str) -> str | None:
+    """Devuelve el motivo de rechazo, o None si la contraseña es aceptable.
+
+    La longitud sola no basta: '12345678912345' tiene catorce caracteres y se
+    adivina al primer intento. Se rechazan secuencias, repeticiones y patrones
+    de teclado, que es justo lo que se escribe cuando el único requisito es un
+    mínimo de longitud.
+    """
+    if len(password) < MIN_PASSWORD:
+        return f"debe tener al menos {MIN_PASSWORD} caracteres"
+
+    if len(set(password)) < 5:
+        return "usa muy pocos caracteres distintos"
+
+    minuscula = password.lower()
+
+    for base in ("0123456789", "abcdefghijklmnopqrstuvwxyz"):
+        for referencia in (base, base[::-1]):
+            for inicio in range(len(referencia) - 5):
+                if referencia[inicio : inicio + 6] in minuscula:
+                    return "contiene una secuencia previsible (12345…, abcde…)"
+
+    for patron in ("qwerty", "asdfgh", "password", "contrasena", "dental", "admin"):
+        if patron in minuscula:
+            return f"contiene un patrón previsible ({patron})"
+
+    if password.isdigit():
+        return "no puede ser sólo dígitos"
+
+    return None
+
+
+def pedir_password() -> str:
+    """Pide la contraseña dos veces por consola y la valida."""
+    password = getpass("Contraseña: ")
+
+    motivo = revisar_password(password)
+    if motivo:
+        print(f"Contraseña rechazada: {motivo}", file=sys.stderr)
+        raise SystemExit(1)
+
+    if password != getpass("Repetir: "):
+        print("Las contraseñas no coinciden", file=sys.stderr)
+        raise SystemExit(1)
+
+    return password
+
+
+def cambiar_password() -> None:
+    """Rota la contraseña de un usuario existente.
+
+    python -m app.cli cambiar-password <email>
+    """
+    if len(sys.argv) < 3:
+        print("uso: python -m app.cli cambiar-password <email>", file=sys.stderr)
+        raise SystemExit(2)
+
+    email = sys.argv[2].strip().lower()
+
+    with SessionLocal() as db:
+        usuario = db.scalar(select(Usuario).where(Usuario.email == email))
+        if usuario is None:
+            print(f"No existe ningún usuario con el email {email}", file=sys.stderr)
+            raise SystemExit(1)
+
+        usuario.password_hash = hash_password(pedir_password())
+        db.commit()
+
+    print(f"[cli] contraseña de {email} actualizada")
+
+
 def crear_usuario() -> None:
     """Da de alta un usuario real. Uso:
 
@@ -92,13 +166,7 @@ def crear_usuario() -> None:
 
     doctor_id = int(sys.argv[4]) if len(sys.argv) > 4 else None
 
-    password = getpass("Contraseña: ")
-    if len(password) < 12:
-        print("La contraseña debe tener al menos 12 caracteres", file=sys.stderr)
-        raise SystemExit(1)
-    if password != getpass("Repetir: "):
-        print("Las contraseñas no coinciden", file=sys.stderr)
-        raise SystemExit(1)
+    password = pedir_password()
 
     with SessionLocal() as db:
         if db.scalar(select(Usuario).where(Usuario.email == email)):
@@ -123,6 +191,7 @@ COMMANDS = {
     "db-baseline": db_baseline,
     "seed-users": seed_users,
     "crear-usuario": crear_usuario,
+    "cambiar-password": cambiar_password,
 }
 
 

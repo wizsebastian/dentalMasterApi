@@ -1,5 +1,7 @@
 """Autenticación y control de acceso por rol."""
 
+import pytest
+
 LOGIN = "/api/v1/auth/login"
 
 
@@ -64,3 +66,30 @@ def test_recepcion_si_puede_dar_de_alta_pacientes(client, cabeceras_recepcion):
         headers=cabeceras_recepcion,
     )
     assert r.status_code == 201
+
+
+class TestFortalezaPassword:
+    """La longitud sola no basta: '12345678912345' tiene catorce caracteres."""
+
+    @pytest.mark.parametrize(
+        "password",
+        [
+            "12345678912345",  # secuencia de dígitos
+            "abcdefghijklm",  # secuencia de letras
+            "aaaaaaaaaaaaaa",  # apenas un carácter distinto
+            "corta1!",  # demasiado corta
+            "qwertyuiop12",  # patrón de teclado
+            "dental2026aa",  # nombre del producto
+            "99887766554433",  # sólo dígitos
+        ],
+    )
+    def test_rechaza_las_previsibles(self, password):
+        from app.cli import revisar_password
+
+        assert revisar_password(password) is not None
+
+    @pytest.mark.parametrize("password", ["Roble-Cauce-91x", "mQ7v!raiz-lento"])
+    def test_acepta_las_razonables(self, password):
+        from app.cli import revisar_password
+
+        assert revisar_password(password) is None
