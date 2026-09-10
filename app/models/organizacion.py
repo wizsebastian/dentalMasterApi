@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Numeric,
     Text,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,7 +31,7 @@ class Sede(Base):
     email: Mapped[str | None] = mapped_column(Text)
     rnc: Mapped[str | None] = mapped_column(Text)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
-    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Especialidad(Base):
@@ -70,7 +71,7 @@ class Doctor(Base):
     fecha_ingreso: Mapped[date | None] = mapped_column(Date)
     porcentaje_comision: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
-    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     sede: Mapped[Sede | None] = relationship(lazy="joined")
     especialidades: Mapped[list[DoctorEspecialidad]] = relationship(cascade="all, delete-orphan")
@@ -91,6 +92,6 @@ class Usuario(Base):
         Enum(RolUsuario, name="rol_usuario_t", values_callable=lambda e: [m.value for m in e])
     )
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
-    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     doctor: Mapped[Doctor | None] = relationship(lazy="joined")

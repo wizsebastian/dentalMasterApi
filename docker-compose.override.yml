@@ -13,4 +13,5 @@ services:
     volumes:
       - ./app:/srv/app:ro
       - ./migrations:/srv/migrations:ro
+      - ./tests:/srv/tests:ro
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
