@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # propiedad de abajo.
     cors_origins: str = "http://localhost:5173"
 
+    # El servidor corre en UTC; «hoy» y las horas que se muestran son las de la clínica.
+    zona_horaria: str = "America/Santo_Domingo"
+
+    # Almacén de archivos (fotos, exámenes, comprobantes): un volumen aparte.
+    almacen_dir: str = "/srv/almacen"
+    archivo_max_mb: int = 25
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

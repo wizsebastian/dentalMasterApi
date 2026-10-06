@@ -32,6 +32,9 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dental}:${POSTGRES_PASSWORD:-dental}@db:5432/${POSTGRES_DB:-odonto}
       SECRET_KEY: ${SECRET_KEY:-cambiar-en-produccion}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+    volumes:
+      # Fotos, exámenes y comprobantes. Vive aparte de la base: se respalda con ella.
+      - dentalmaster-archivos:/srv/almacen
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -51,3 +54,4 @@ services:
 
 volumes:
   dentalmaster-pgdata:
+  dentalmaster-archivos:

@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Integer,
     Numeric,
     Text,
     func,
@@ -28,8 +29,13 @@ class Sede(Base):
     direccion: Mapped[str | None] = mapped_column(Text)
     ciudad: Mapped[str | None] = mapped_column(Text)
     telefono: Mapped[str | None] = mapped_column(Text)
+    whatsapp: Mapped[str | None] = mapped_column(Text)
     email: Mapped[str | None] = mapped_column(Text)
+    web: Mapped[str | None] = mapped_column(Text)
     rnc: Mapped[str | None] = mapped_column(Text)
+    logo_archivo_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("archivo.id"))
+    onboarding_cerrado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    catalogo_revisado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -41,6 +47,33 @@ class Especialidad(Base):
     codigo: Mapped[str] = mapped_column(Text, unique=True)
     nombre: Mapped[str] = mapped_column(Text)
     descripcion: Mapped[str | None] = mapped_column(Text)
+    activo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class UnidadDental(Base):
+    """Un sillón. Es un recurso de la agenda: la base impide ocuparlo dos veces."""
+
+    __tablename__ = "unidad_dental"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    sede_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("sede.id"))
+    nombre: Mapped[str] = mapped_column(Text)
+    alquilada: Mapped[bool] = mapped_column(Boolean, default=False)
+    orden: Mapped[int] = mapped_column(Integer, default=0)
+    activo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Correlativo(Base):
+    """Último número emitido de cada serie (expedientes, planes, recibos).
+
+    No se escribe desde el ORM: lo avanza `services/correlativos.py` con un
+    INSERT … ON CONFLICT que bloquea la fila hasta el fin de la transacción.
+    """
+
+    __tablename__ = "correlativo"
+
+    clave: Mapped[str] = mapped_column(Text, primary_key=True)
+    ultimo: Mapped[int] = mapped_column(BigInteger, default=0)
 
 
 class DoctorEspecialidad(Base):

@@ -3,7 +3,11 @@
 -- Uso:  psql -d odonto -f 99_verify.sql
 -- Salida: tabla de checks con estado PASS/FAIL y un resumen final.
 -- Este script es de solo lectura: no modifica datos.
+-- Termina con error si alguna aserción falla o si no se evaluaron las 98.
 -- =====================================================================
+-- Cada bloque es un único INSERT: sin esto, una subconsulta rota se llevaría el
+-- bloque entero y el resumen saldría en verde con menos filas.
+\set ON_ERROR_STOP on
 \pset border 2
 \pset format aligned
 
@@ -19,13 +23,13 @@ CREATE TEMP TABLE _chk (
 -- BLOQUE C · ESTRUCTURA DEL ESQUEMA
 -- ---------------------------------------------------------------------
 INSERT INTO _chk VALUES
-('C-01','estructura','Tablas base del dominio en public','40',
+('C-01','estructura','Tablas base del dominio en public','56',
  -- alembic_version queda fuera: es infraestructura de migraciones, no del
  -- modelo clínico, y sólo existe una vez que la API ancla el baseline.
  (SELECT count(*)::text FROM information_schema.tables
    WHERE table_schema='public' AND table_type='BASE TABLE'
      AND table_name <> 'alembic_version')),
-('C-02','estructura','Vistas creadas','3',
+('C-02','estructura','Vistas creadas','6',
  (SELECT count(*)::text FROM information_schema.views WHERE table_schema='public')),
 ('C-03','estructura','Tipos ENUM creados','13',
  (SELECT count(*)::text FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace
@@ -39,7 +43,13 @@ INSERT INTO _chk VALUES
    WHERE constraint_schema='public' AND constraint_type='FOREIGN KEY')),
 ('C-06','estructura','Columna generada plan_item.total','ALWAYS',
  (SELECT COALESCE(MAX(is_generated),'NO') FROM information_schema.columns
-   WHERE table_name='plan_item' AND column_name='total'));
+   WHERE table_name='plan_item' AND column_name='total')),
+('C-07','estructura','Columna generada procedimiento.total','ALWAYS',
+ (SELECT COALESCE(MAX(is_generated),'NO') FROM information_schema.columns
+   WHERE table_name='procedimiento' AND column_name='total')),
+('C-08','estructura','Exclusiones de solape en cita (doctor y unidad)','2',
+ (SELECT count(*)::text FROM pg_constraint
+   WHERE conrelid='cita'::regclass AND contype='x'));
 
 -- ---------------------------------------------------------------------
 -- BLOQUE K · CATÁLOGOS MAESTROS
@@ -75,7 +85,15 @@ INSERT INTO _chk VALUES
 ('K-22','catalogos','Condiciones médicas','14',                   (SELECT count(*)::text FROM condicion_medica)),
 ('K-23','catalogos','Alergias','8',                               (SELECT count(*)::text FROM alergia)),
 ('K-24','catalogos','Aseguradoras','5',                           (SELECT count(*)::text FROM aseguradora)),
-('K-25','catalogos','Sistemas de implante','6',                   (SELECT count(*)::text FROM sistema_implante));
+('K-25','catalogos','Sistemas de implante','6',                   (SELECT count(*)::text FROM sistema_implante)),
+('K-26','catalogos','Plantillas de documento','6',                (SELECT count(*)::text FROM plantilla_documento)),
+('K-27','catalogos','Plantillas con variables sin cerrar','0',
+ (SELECT count(*)::text FROM plantilla_documento
+   WHERE (length(cuerpo) - length(replace(cuerpo,'{{',''))) <> (length(cuerpo) - length(replace(cuerpo,'}}',''))))),
+('K-28','catalogos','Categorías de gasto / de insumo','8/6',
+ (SELECT (SELECT count(*) FROM categoria_gasto)::text || '/' || (SELECT count(*) FROM categoria_insumo)::text)),
+('K-29','catalogos','Alergias a medicamentos sin palabras clave','0',
+ (SELECT count(*)::text FROM alergia WHERE tipo='medicamento' AND cardinality(palabras_clave)=0));
 
 -- ---------------------------------------------------------------------
 -- BLOQUE D · DATOS DEMO
@@ -94,8 +112,8 @@ INSERT INTO _chk VALUES
 ('D-10','demo','Condiciones médicas asignadas','5',(SELECT count(*)::text FROM ficha_condicion)),
 ('D-11','demo','Alergias asignadas','3',           (SELECT count(*)::text FROM ficha_alergia)),
 ('D-12','demo','Medicamentos en uso','4',          (SELECT count(*)::text FROM ficha_medicamento)),
-('D-13','demo','Citas','7',                        (SELECT count(*)::text FROM cita)),
-('D-14','demo','Consultas','3',                    (SELECT count(*)::text FROM consulta)),
+('D-13','demo','Citas','13',                       (SELECT count(*)::text FROM cita)),
+('D-14','demo','Consultas','5',                    (SELECT count(*)::text FROM consulta)),
 ('D-15','demo','Odontogramas','3',                 (SELECT count(*)::text FROM odontograma)),
 ('D-16','demo','Odontogramas vigentes','3',        (SELECT count(*)::text FROM odontograma WHERE es_actual)),
 ('D-17','demo','Estados de pieza registrados','6', (SELECT count(*)::text FROM odontograma_diente)),
@@ -108,9 +126,17 @@ INSERT INTO _chk VALUES
 ('D-24','demo','Documentos clínicos','5',          (SELECT count(*)::text FROM documento_clinico)),
 ('D-25','demo','Prescripciones / ítems','1/3',
  (SELECT (SELECT count(*) FROM prescripcion)::text || '/' || (SELECT count(*) FROM prescripcion_item)::text)),
-('D-26','demo','Consentimientos firmados','1',     (SELECT count(*)::text FROM consentimiento WHERE firmado_en IS NOT NULL)),
-('D-27','demo','Facturas / ítems / pagos','3/7/4',
- (SELECT (SELECT count(*) FROM factura)::text || '/' || (SELECT count(*) FROM factura_item)::text || '/' || (SELECT count(*) FROM pago)::text));
+('D-26','demo','Consentimientos firmados','1',
+ (SELECT count(*)::text FROM documento_emitido d
+   WHERE d.tipo='consentimiento' AND EXISTS (SELECT 1 FROM firma f WHERE f.documento_emitido_id=d.id))),
+('D-27','demo','Facturas / ítems / pagos / aplicaciones','3/7/5/5',
+ (SELECT (SELECT count(*) FROM factura)::text || '/' || (SELECT count(*) FROM factura_item)::text || '/'
+      || (SELECT count(*) FROM pago)::text || '/' || (SELECT count(*) FROM pago_aplicacion)::text)),
+('D-28','demo','Unidades dentales','2',            (SELECT count(*)::text FROM unidad_dental)),
+('D-29','demo','Insumos / movimientos de kárdex','5/8',
+ (SELECT (SELECT count(*) FROM insumo)::text || '/' || (SELECT count(*) FROM movimiento_insumo)::text)),
+('D-30','demo','Gastos / proveedores','3/1',
+ (SELECT (SELECT count(*) FROM gasto)::text || '/' || (SELECT count(*) FROM proveedor)::text));
 
 -- ---------------------------------------------------------------------
 -- BLOQUE R · REGLAS DE NEGOCIO Y CONSISTENCIA
@@ -135,13 +161,16 @@ INSERT INTO _chk VALUES
  (SELECT count(*)::text FROM (
     SELECT f.id FROM factura f JOIN factura_item fi ON fi.factura_id=f.id
     GROUP BY f.id, f.total HAVING SUM(fi.total)::numeric(12,2) <> f.total) q)),
-('R-07','reglas','Balance pendiente del paciente 1','8925.00',
- (SELECT SUM(balance)::numeric(12,2)::text FROM v_estado_cuenta WHERE paciente_id=1)),
-('R-08','reglas','Facturas con pagos que exceden el total','0',
- (SELECT count(*)::text FROM v_estado_cuenta WHERE balance < 0)),
-('R-09','reglas','Factura marcada pagada con balance distinto de cero','0',
- (SELECT count(*)::text FROM v_estado_cuenta ec JOIN factura f ON f.id=ec.factura_id
-   WHERE f.estado='pagada' AND ec.balance <> 0)),
+('R-07','reglas','Balance pendiente del paciente 1','14925.00',
+ (SELECT balance::numeric(12,2)::text FROM v_estado_cuenta WHERE paciente_id=1)),
+('R-08','reglas','Aplicaciones que exceden su pago o su consulta','0',
+ (SELECT ((SELECT count(*) FROM (SELECT pg.id FROM pago pg JOIN pago_aplicacion a ON a.pago_id=pg.id
+                                  GROUP BY pg.id, pg.monto HAVING SUM(a.monto) > pg.monto) q)
+        + (SELECT count(*) FROM v_saldo_consulta WHERE saldo < 0))::text)),
+('R-09','reglas','Pacientes cuyo saldo por consulta no concilia con el balance','0',
+ (SELECT count(*)::text FROM v_estado_cuenta ec
+   WHERE ec.balance <> COALESCE((SELECT SUM(sc.saldo) FROM v_saldo_consulta sc
+                                  WHERE sc.paciente_id=ec.paciente_id),0) - ec.credito_sin_aplicar)),
 ('R-10','reglas','Alertas clínicas activas (alto riesgo + alergias)','7',
  (SELECT count(*)::text FROM v_alertas_paciente)),
 ('R-11','reglas','Alertas del paciente 4 (anticoagulado)','4',
@@ -173,7 +202,55 @@ INSERT INTO _chk VALUES
  (SELECT count(*)::text FROM (
     SELECT 1 FROM paciente WHERE id > (SELECT last_value FROM paciente_id_seq)
     UNION ALL SELECT 1 FROM doctor WHERE id > (SELECT last_value FROM doctor_id_seq)
-    UNION ALL SELECT 1 FROM factura WHERE id > (SELECT last_value FROM factura_id_seq)) q));
+    UNION ALL SELECT 1 FROM factura WHERE id > (SELECT last_value FROM factura_id_seq)
+    UNION ALL SELECT 1 FROM pago WHERE id > (SELECT last_value FROM pago_id_seq)) q)),
+('R-22','reglas','Correlativos por detrás de lo ya emitido','0',
+ (SELECT count(*)::text FROM (
+    SELECT 1 WHERE COALESCE((SELECT ultimo FROM correlativo WHERE clave='recibo'),0)
+                 < COALESCE((SELECT MAX(numero_recibo) FROM pago),0)
+    UNION ALL
+    SELECT 1 WHERE COALESCE((SELECT ultimo FROM correlativo WHERE clave='paciente:2026'),0)
+                 < COALESCE((SELECT MAX(split_part(codigo,'-',3)::int) FROM paciente WHERE codigo LIKE 'PAC-2026-%'),0)
+    UNION ALL
+    SELECT 1 WHERE COALESCE((SELECT ultimo FROM correlativo WHERE clave='plan:2026'),0)
+                 < COALESCE((SELECT MAX(split_part(codigo,'-',3)::int) FROM plan_tratamiento WHERE codigo LIKE 'PT-2026-%'),0)) q)),
+('R-23','reglas','Huecos en la numeración de recibos','0',
+ (SELECT (COALESCE(MAX(numero_recibo),0) - count(*))::text FROM pago)),
+('R-24','reglas','Saldo de la consulta 2 (implante, abonada)','8925.00',
+ (SELECT saldo::numeric(12,2)::text FROM v_saldo_consulta WHERE consulta_id=2)),
+('R-25','reglas','Balance del paciente 2 (su único pago está anulado)','0.00',
+ (SELECT balance::numeric(12,2)::text FROM v_estado_cuenta WHERE paciente_id=2)),
+('R-26','reglas','Citas vivas solapadas por doctor sin sobrecupo','0',
+ (SELECT count(*)::text FROM cita a JOIN cita b
+     ON a.id < b.id AND a.doctor_id = b.doctor_id
+    AND tstzrange(a.inicio,a.fin,'[)') && tstzrange(b.inicio,b.fin,'[)')
+  WHERE a.estado NOT IN ('cancelada','no_asistio') AND b.estado NOT IN ('cancelada','no_asistio')
+    AND NOT a.sobrecupo AND NOT b.sobrecupo)),
+('R-27','reglas','Firmas cuyo hash no es el del documento que firman','0',
+ (SELECT count(*)::text FROM firma f JOIN documento_emitido d ON d.id=f.documento_emitido_id
+   WHERE f.hash_documento <> d.sha256 OR d.sha256 <> encode(digest(d.cuerpo,'sha256'),'hex'))),
+('R-28','reglas','Existencia de resina A2 (suma del kárdex)','3.000',
+ (SELECT existencia::text FROM v_existencia_insumo WHERE insumo_id=1)),
+('R-29','reglas','Insumos en su mínimo o por debajo','1',
+ (SELECT count(*)::text FROM v_existencia_insumo WHERE bajo_minimo)),
+('R-30','reglas','Costo en insumos de REST-001, según su receta','425.00',
+ (SELECT cs.costo_insumos::text FROM v_costo_servicio cs JOIN servicio s ON s.id=cs.servicio_id
+   WHERE s.codigo='REST-001')),
+('R-31','reglas','Gastos de septiembre 2026, sin anulados','72650.00',
+ (SELECT COALESCE(SUM(monto),0)::numeric(12,2)::text FROM gasto
+   WHERE anulado_en IS NULL AND fecha BETWEEN '2026-09-01' AND '2026-09-30')),
+('R-32','reglas','Líneas facturadas en más de un comprobante vivo','0',
+ (SELECT count(*)::text FROM (
+    SELECT fi.procedimiento_id FROM factura_item fi JOIN factura f ON f.id=fi.factura_id
+     WHERE f.estado <> 'anulada' AND fi.procedimiento_id IS NOT NULL
+     GROUP BY fi.procedimiento_id HAVING count(*) > 1) q)),
+('R-33','reglas','Secuencias de NCF por detrás de lo ya emitido','0',
+ (SELECT count(*)::text FROM secuencia_ncf s
+   WHERE s.activo AND s.siguiente <= COALESCE(
+     (SELECT MAX(substr(f.numero,4)::bigint) FROM factura f WHERE left(f.numero,3) = s.tipo), 0))),
+('R-34','reglas','La sede de la demo tiene cerrada la guía de primeros pasos','1',
+ (SELECT count(*)::text FROM sede
+   WHERE onboarding_cerrado_en IS NOT NULL AND catalogo_revisado_en IS NOT NULL));
 
 -- ---------------------------------------------------------------------
 -- REPORTE
@@ -199,3 +276,15 @@ FROM _chk;
 \echo '--- Fallos detectados (vacío = verificación 100% correcta) ---'
 SELECT id, descripcion, esperado, obtenido FROM _chk
 WHERE esperado IS DISTINCT FROM obtenido ORDER BY id;
+
+-- El script falla (código de salida distinto de cero) si algo no pasó o si
+-- faltan aserciones: quien lo invoque no necesita leer la tabla.
+DO $$
+DECLARE fallos INT; total INT;
+BEGIN
+  SELECT count(*) FILTER (WHERE esperado IS DISTINCT FROM obtenido), count(*)
+    INTO fallos, total FROM _chk;
+  IF fallos > 0 OR total <> 101 THEN
+    RAISE EXCEPTION 'Verificación fallida: % FAIL de % aserciones (se esperaban 101)', fallos, total;
+  END IF;
+END $$;

@@ -132,12 +132,16 @@ class OdontogramaLeer(OdontogramaResumen):
 class OdontogramaCrear(BaseModel):
     """Crea la versión N+1 del odontograma de un paciente."""
 
-    denticion: Denticion = Denticion.PERMANENTE
+    denticion: Denticion | None = Field(
+        default=None,
+        description="Por defecto, la de la versión vigente (permanente si es la primera)",
+    )
     observaciones: str | None = None
     copiar_hallazgos: bool = Field(
         default=True,
         description=(
             "Arrastra los hallazgos 'existente' y 'completado' de la versión "
-            "anterior. Lo planificado no se copia: pertenece al plan que lo originó."
+            "anterior, y lo planificado por un ítem de un plan. Lo propuesto a mano "
+            "no se copia."
         ),
     )

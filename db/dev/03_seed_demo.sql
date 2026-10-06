@@ -6,16 +6,23 @@
 -- ---------------------------------------------------------------------
 -- SEDE
 -- ---------------------------------------------------------------------
-INSERT INTO sede (id, nombre, direccion, ciudad, telefono, email, rnc) VALUES
- (1,'Clínica Dental Sonrisa','Av. Winston Churchill #45, Piantini','Santo Domingo','809-555-0100','info@dentalsonrisa.do','1-31-00000-1');
+INSERT INTO sede (id, nombre, direccion, ciudad, telefono, whatsapp, email, web, rnc) VALUES
+ (1,'Clínica Dental Sonrisa','Av. Winston Churchill #45, Piantini','Santo Domingo','(809) 555-0100','(809) 555-0101','info@dentalsonrisa.do','www.dentalsonrisa.do','1-31-00000-1');
+
+-- La demo ya está configurada: no arranca con la guía de primeros pasos.
+UPDATE sede SET onboarding_cerrado_en = now(), catalogo_revisado_en = now();
+
+INSERT INTO unidad_dental (id, sede_id, nombre, alquilada, orden) VALUES
+ (1,1,'Unidad 1',FALSE,1),
+ (2,1,'Unidad 2',TRUE,2);
 
 -- ---------------------------------------------------------------------
 -- DOCTORES
 -- ---------------------------------------------------------------------
 INSERT INTO doctor (id, sede_id, documento, nombres, apellidos, licencia, email, telefono, fecha_ingreso, porcentaje_comision) VALUES
- (1,1,'001-1234567-1','Laura','Fernández Cruz','EXQ-10245','laura.fernandez@dentalsonrisa.do','809-555-0111','2019-02-01',40.00),
- (2,1,'001-2345678-2','Miguel Antonio','Reyes Peralta','EXQ-11890','miguel.reyes@dentalsonrisa.do','809-555-0112','2020-06-15',45.00),
- (3,1,'001-3456789-3','Carolina','Batista Núñez','EXQ-12733','carolina.batista@dentalsonrisa.do','809-555-0113','2022-01-10',40.00);
+ (1,1,'001-1234567-1','Laura','Fernández Cruz','EXQ-10245','laura.fernandez@dentalsonrisa.do','(809) 555-0111','2019-02-01',40.00),
+ (2,1,'001-2345678-2','Miguel Antonio','Reyes Peralta','EXQ-11890','miguel.reyes@dentalsonrisa.do','(809) 555-0112','2020-06-15',45.00),
+ (3,1,'001-3456789-3','Carolina','Batista Núñez','EXQ-12733','carolina.batista@dentalsonrisa.do','(809) 555-0113','2022-01-10',40.00);
 
 INSERT INTO doctor_especialidad (doctor_id, especialidad_id, principal)
 SELECT d.id, e.id, v.principal
@@ -36,16 +43,16 @@ INSERT INTO usuario (id, doctor_id, email, password_hash, rol) VALUES
 -- PACIENTES
 -- ---------------------------------------------------------------------
 INSERT INTO paciente (id, codigo, documento, nombres, apellidos, fecha_nacimiento, sexo, celular, email, direccion, ciudad, ocupacion, tipo_sangre, referido_por, sede_id) VALUES
- (1,'PAC-2026-0001','402-1112223-4','Juan Carlos','Peña Rosario','1985-03-12','M','809-777-0001','jc.pena@example.com','C/ Los Robles #12, Naco','Santo Domingo','Ingeniero civil','O+','Google',1),
- (2,'PAC-2026-0002','402-2223334-5','María Altagracia','Gómez Lantigua','1992-07-25','F','809-777-0002','maria.gomez@example.com','Av. Independencia #340','Santo Domingo','Contadora','A+','Paciente PAC-2026-0001',1),
- (3,'PAC-2026-0003',NULL,'Sofía Nicole','Martínez Gómez','2018-05-09','F','809-777-0003',NULL,'Av. Independencia #340','Santo Domingo',NULL,'A+','Madre: María Gómez',1),
- (4,'PAC-2026-0004','001-9998887-6','Rafael','Ureña Santos','1968-11-02','M','809-777-0004','r.urena@example.com','C/ Duarte #88, Villa Mella','Santo Domingo','Comerciante','B+','Referido médico',1);
+ (1,'PAC-2026-0001','402-1112223-4','Juan Carlos','Peña Rosario','1985-03-12','M','(809) 777-0001','jc.pena@example.com','C/ Los Robles #12, Naco','Santo Domingo','Ingeniero civil','O+','Google',1),
+ (2,'PAC-2026-0002','402-2223334-5','María Altagracia','Gómez Lantigua','1992-07-25','F','(809) 777-0002','maria.gomez@example.com','Av. Independencia #340','Santo Domingo','Contadora','A+','Paciente PAC-2026-0001',1),
+ (3,'PAC-2026-0003',NULL,'Sofía Nicole','Martínez Gómez','2018-05-09','F','(809) 777-0003',NULL,'Av. Independencia #340','Santo Domingo',NULL,'A+','Madre: María Gómez',1),
+ (4,'PAC-2026-0004','001-9998887-6','Rafael','Ureña Santos','1968-11-02','M','(809) 777-0004','r.urena@example.com','C/ Duarte #88, Villa Mella','Santo Domingo','Comerciante','B+','Referido médico',1);
 
 INSERT INTO paciente_contacto (paciente_id, nombre, parentesco, telefono, es_emergencia, es_tutor) VALUES
- (1,'Ana Rosario','Esposa','809-777-1001',TRUE,FALSE),
- (2,'Pedro Gómez','Hermano','809-777-1002',TRUE,FALSE),
- (3,'María Altagracia Gómez','Madre','809-777-0002',TRUE,TRUE),
- (4,'Yolanda Santos','Hija','809-777-1004',TRUE,FALSE);
+ (1,'Ana Rosario','Esposa','(809) 777-1001',TRUE,FALSE),
+ (2,'Pedro Gómez','Hermano','(809) 777-1002',TRUE,FALSE),
+ (3,'María Altagracia Gómez','Madre','(809) 777-0002',TRUE,TRUE),
+ (4,'Yolanda Santos','Hija','(809) 777-1004',TRUE,FALSE);
 
 INSERT INTO paciente_seguro (paciente_id, aseguradora_id, poliza, plan, titular, vigente_desde, principal) VALUES
  (1,(SELECT id FROM aseguradora WHERE codigo='ARS01'),'HUM-884512','Plan Complementario','Juan Carlos Peña','2024-01-01',TRUE),
@@ -117,6 +124,24 @@ INSERT INTO cita (id, paciente_id, doctor_id, sede_id, inicio, fin, motivo, esta
  (6,3,3,1,'2026-06-11 08:30-04','2026-06-11 09:10-04','Chequeo pediátrico','atendida'),
  (7,4,2,1,'2026-09-22 14:00-04','2026-09-22 15:00-04','Evaluación de prótesis','agendada');
 
+-- Agenda de hoy y de mañana, relativa al día en que se carga el seed: así el
+-- tablero «Hoy» no arranca vacío. El día se toma en la hora de la clínica, no en
+-- la del servidor (UTC), que por la noche ya es el día siguiente.
+INSERT INTO cita (id, paciente_id, doctor_id, sede_id, unidad_id, inicio, fin, motivo, estado)
+SELECT v.id, v.pac, v.doc, 1, v.unidad,
+       (hoy.dia + v.dias + v.desde::time) AT TIME ZONE 'America/Santo_Domingo',
+       (hoy.dia + v.dias + v.hasta::time) AT TIME ZONE 'America/Santo_Domingo',
+       v.motivo, v.estado::estado_cita_t
+FROM (SELECT (now() AT TIME ZONE 'America/Santo_Domingo')::date AS dia) hoy,
+     (VALUES
+       ( 8,2,1,1,   0,'09:00','09:40','Profilaxis','atendida'),
+       ( 9,3,3,2,   0,'10:00','10:30','Control pediátrico','en_sala'),
+       (10,4,2,1,   0,'11:00','12:00','Evaluación de prótesis','confirmada'),
+       (11,2,1,2,   0,'15:00','15:30','Revisión de encías','agendada'),
+       (12,4,2,NULL,0,'16:00','16:30','Control','cancelada'),
+       (13,3,3,1,   1,'09:30','10:00','Sellantes','agendada')
+     ) AS v(id,pac,doc,unidad,dias,desde,hasta,motivo,estado);
+
 -- ---------------------------------------------------------------------
 -- CONSULTAS
 -- ---------------------------------------------------------------------
@@ -138,6 +163,11 @@ INSERT INTO consulta (id, paciente_id, doctor_id, cita_id, fecha, motivo,
   'Caries oclusal en 54 y 74. Pieza 85 con caries profunda, sin sintomatología pulpar espontánea. Dentición mixta, 16 y 26 en erupción.',
   'Caries de la infancia temprana',
   'Sellantes en 16 y 26, resinas en 54 y 74, pulpotomía + corona de acero en 85. Flúor y control de dieta.');
+
+-- Visitas de los procedimientos 3 (resina en 16) y 6 (segunda fase del implante).
+INSERT INTO consulta (id, paciente_id, doctor_id, cita_id, fecha, motivo) VALUES
+ (4,1,1,NULL,'2026-03-20 16:00-04','Resina en 16'),
+ (5,1,2,3,'2026-08-12 10:05-04','Segunda fase quirúrgica');
 
 -- ---------------------------------------------------------------------
 -- ODONTOGRAMAS
@@ -220,14 +250,25 @@ SELECT v.id, v.pac, v.doc, s.id, v.cons, v.item, v.fdi, v.sup, v.fecha::date, v.
 FROM (VALUES
  (1,1,1,'DX-001',1,NULL,NULL,NULL,'2026-03-02','completado',NULL,NULL,1200,'Evaluación inicial y odontograma'),
  (2,1,1,'DX-003',1,NULL,NULL,NULL,'2026-03-02','completado',NULL,NULL,2500,'Panorámica de diagnóstico'),
- (3,1,1,'REST-001',NULL,1,16,'O','2026-03-20','completado','Lidocaína 2% c/epinefrina 1 carpule','Resina Z350 A2, adhesivo universal',2800,'Sin complicaciones'),
+ (3,1,1,'REST-001',4,1,16,'O','2026-03-20','completado','Lidocaína 2% c/epinefrina 1 carpule','Resina Z350 A2, adhesivo universal',2800,'Sin complicaciones'),
  (4,1,2,'DX-004',2,NULL,36,NULL,'2026-04-08','completado',NULL,NULL,6500,'CBCT sector 36 para planificación'),
  (5,1,2,'IMPL-001',2,3,36,NULL,'2026-04-15','completado','Lidocaína 2% c/epinefrina 2 carpules','Implante Straumann BLX 4.0x10, tornillo de cierre',45000,'Torque 35 Ncm, ISQ 72. Sutura 4-0. Profilaxis con clindamicina por alergia a penicilina.'),
- (6,1,2,'IMPL-006',NULL,NULL,36,NULL,'2026-08-12','completado','Lidocaína 2% 1 carpule','Tornillo de cicatrización 4.5mm',6000,'Segunda fase. ISQ 78. Cicatrización favorable.'),
+ (6,1,2,'IMPL-006',5,NULL,36,NULL,'2026-08-12','completado','Lidocaína 2% 1 carpule','Tornillo de cicatrización 4.5mm',6000,'Segunda fase. ISQ 78. Cicatrización favorable.'),
  (7,3,3,'REST-001',3,NULL,54,'O','2026-06-11','completado','Anestesia tópica + infiltrativa','Ionómero de vidrio',2800,'Manejo de conducta con técnica decir-mostrar-hacer'),
  (8,3,3,'ODP-002',3,NULL,NULL,NULL,'2026-06-11','completado',NULL,'Barniz de flúor 5% NaF',1500,'Refuerzo de higiene con la madre')
 ) AS v(id,pac,doc,cod,cons,item,fdi,sup,fecha,estado,anest,mat,precio,notas)
 JOIN servicio s ON s.codigo = v.cod;
+
+-- El 5 % del plan PT-2026-0001 se copia a la línea al ejecutarla: así el cargo
+-- no depende de un join al plan.
+UPDATE procedimiento SET descuento_pct = 5 WHERE id IN (4,5);
+
+-- El plan es la carpeta: las visitas del implante y la resina del plan cuelgan de él.
+-- La consulta 1 (evaluación inicial) queda suelta a propósito.
+UPDATE consulta SET plan_id = 1 WHERE id IN (2,4,5);
+
+UPDATE paciente SET doctor_tratante_id = v.doc
+FROM (VALUES (1,2),(2,1),(3,3),(4,2)) AS v(pac,doc) WHERE paciente.id = v.pac;
 
 -- ---------------------------------------------------------------------
 -- IMPLANTE + SEGUIMIENTO
@@ -267,16 +308,35 @@ INSERT INTO prescripcion_item (prescripcion_id, medicamento, presentacion, dosis
  (1,'Ibuprofeno','Tabletas 600 mg','1 tableta','Cada 8 horas','3 días'),
  (1,'Clorhexidina 0.12%','Enjuague bucal','15 ml','2 veces al día','14 días');
 
-INSERT INTO consentimiento (paciente_id, plan_id, tipo, firmado_en, firmante, url_documento) VALUES
- (1,1,'implante','2026-04-15 09:40-04','Juan Carlos Peña Rosario','/storage/pac/1/consent/implante-36.pdf');
+-- El consentimiento del implante: un documento emitido con su firma.
+INSERT INTO documento_emitido (id, paciente_id, tipo, plantilla_id, titulo, cuerpo, plan_id, doctor_id,
+                               requiere_firma, sha256, emitido_por, emitido_en)
+SELECT 1, 1, 'consentimiento', pl.id, pl.titulo, t.cuerpo, 1, 2, TRUE,
+       encode(digest(t.cuerpo, 'sha256'), 'hex'), 3, '2026-04-15 09:30-04'
+FROM plantilla_documento pl,
+     LATERAL (SELECT 'Yo, Juan Carlos Peña Rosario, portador de la cédula 402-1112223-4, autorizo a Miguel Antonio Reyes Peralta a colocarme un implante dental en la pieza 36. He sido informado de sus riesgos y alternativas.' AS cuerpo) t
+WHERE pl.codigo = 'CONS-IMPLANTE';
+
+INSERT INTO firma (documento_emitido_id, firmante_nombre, firmante_rol, firmante_documento, trazo,
+                   hash_documento, firmado_en)
+SELECT 1, 'Juan Carlos Peña Rosario', 'paciente', '402-1112223-4',
+       '[[[12,40],[30,18],[46,44],[62,20],[80,42],[120,30]]]'::jsonb, d.sha256, '2026-04-15 09:40-04'
+FROM documento_emitido d WHERE d.id = 1;
 
 -- ---------------------------------------------------------------------
--- FACTURACIÓN
+-- COMPROBANTES FISCALES, PAGOS Y APLICACIONES
 -- ---------------------------------------------------------------------
 INSERT INTO factura (id, paciente_id, sede_id, plan_id, numero, fecha, moneda, subtotal, descuento, impuesto, cubierto_seguro, total, estado) VALUES
- (1,1,1,1,'B0100000001','2026-03-20','DOP', 6500.00, 0.00, 0.00, 0.00, 6500.00,'pagada'),
- (2,1,1,1,'B0100000002','2026-04-15','DOP',51500.00,2575.00, 0.00, 0.00,48925.00,'parcial'),
- (3,3,1,NULL,'B0100000003','2026-06-11','DOP', 4300.00, 0.00, 0.00, 0.00, 4300.00,'pagada');
+ (1,1,1,1,'B0200000001','2026-03-20','DOP', 6500.00, 0.00, 0.00, 0.00, 6500.00,'emitida'),
+ (2,1,1,1,'B0200000002','2026-04-15','DOP',51500.00,2575.00, 0.00, 0.00,48925.00,'emitida'),
+ (3,3,1,NULL,'B0200000003','2026-06-11','DOP', 4300.00, 0.00, 0.00, 0.00, 4300.00,'emitida');
+
+UPDATE factura SET tipo_ncf = 'B02';
+
+-- Rangos de NCF de la demo: el de consumo ya gastó los tres de arriba.
+INSERT INTO secuencia_ncf (tipo, desde, hasta, siguiente, vence) VALUES
+ ('B02', 1, 500, 4, '2027-12-31'),
+ ('B01', 1, 100, 1, '2027-12-31');
 
 INSERT INTO factura_item (factura_id, procedimiento_id, servicio_id, descripcion, cantidad, precio_unit, descuento_pct, tasa_impuesto, total)
 SELECT v.fac, v.proc, s.id, v.desc_, 1, v.precio, v.desc_pct, 0, ROUND(v.precio * (1 - v.desc_pct/100),2)
@@ -291,11 +351,72 @@ FROM (VALUES
 ) AS v(fac,proc,cod,desc_,precio,desc_pct)
 JOIN servicio s ON s.codigo = v.cod;
 
-INSERT INTO pago (factura_id, fecha, metodo, monto, referencia, recibido_por) VALUES
- (1,'2026-03-20','tarjeta', 6500.00,'AUTH-448120',5),
- (2,'2026-04-15','transferencia',25000.00,'TRF-99120',5),
- (2,'2026-06-10','efectivo',15000.00,NULL,5),
- (3,'2026-06-11','tarjeta', 4300.00,'AUTH-551903',5);
+-- Los pagos son del paciente y llevan recibo correlativo. El 5 está anulado:
+-- conserva su número y queda fuera de todo balance.
+INSERT INTO pago (id, paciente_id, numero_recibo, fecha, metodo, monto, concepto, referencia, recibido_por,
+                  anulado_en, anulado_por, motivo_anulacion) VALUES
+ (1,1,1,'2026-03-20','tarjeta', 6500.00,'Evaluación, panorámica y resina','AUTH-448120',5,NULL,NULL,NULL),
+ (2,1,2,'2026-04-15','transferencia',25000.00,'Abono implante 36','TRF-99120',5,NULL,NULL,NULL),
+ (3,1,3,'2026-06-10','efectivo',15000.00,'Abono implante 36',NULL,5,NULL,NULL,NULL),
+ (4,3,4,'2026-06-11','tarjeta', 4300.00,'Resina y flúor','AUTH-551903',5,NULL,NULL,NULL),
+ (5,2,5,'2026-05-06','efectivo',  500.00,'Abono profilaxis',NULL,5,'2026-05-06 15:20-04',5,'Cita cancelada: se devolvió el abono');
+
+-- A qué consulta se imputa cada pago. La consulta 2 queda con saldo 8 925,00 y la 5
+-- (segunda fase, 6 000,00) sin abonar: el paciente 1 debe 14 925,00.
+INSERT INTO pago_aplicacion (pago_id, consulta_id, paciente_id, monto) VALUES
+ (1,1,1, 3700.00),
+ (1,4,1, 2800.00),
+ (2,2,1,25000.00),
+ (3,2,1,15000.00),
+ (4,3,3, 4300.00);
+
+INSERT INTO correlativo (clave, ultimo) VALUES
+ ('paciente:2026',4),
+ ('plan:2026',1),
+ ('recibo',5);
+
+-- ---------------------------------------------------------------------
+-- GASTOS E INVENTARIO
+-- ---------------------------------------------------------------------
+INSERT INTO proveedor (id, nombre, rnc, telefono) VALUES
+ (1,'Depósito Dental del Caribe','1-01-55555-5','(809) 555-0300');
+
+INSERT INTO insumo (id, nombre, categoria_id, marca, modelo, unidad, controla_stock, stock_minimo, costo, notas)
+SELECT v.id, v.nombre, c.id, v.marca, v.modelo, v.unidad, v.stock, v.minimo, v.costo, v.notas
+FROM (VALUES
+ (1,'Resina compuesta A2','Restauración','3M','Filtek Z350 XT','jeringa 4g',TRUE,3,2200.00,NULL),
+ (2,'Adhesivo universal','Restauración','3M','Single Bond Universal','frasco 5ml',TRUE,1,3200.00,NULL),
+ (3,'Lidocaína 2% con epinefrina','Anestesia','Septodont','Lignospan','cartucho 1.8ml',TRUE,50,45.00,NULL),
+ (4,'Guantes de nitrilo M','Descartables','Kimberly-Clark','Purple','caja 100',TRUE,3,550.00,NULL),
+ (5,'Corona de zirconio (laboratorio)','Laboratorio externo',NULL,NULL,'servicio',FALSE,0,8500.00,'No lleva existencia: se paga por caso')
+) AS v(id,nombre,cat,marca,modelo,unidad,stock,minimo,costo,notas)
+JOIN categoria_insumo c ON c.nombre = v.cat;
+
+-- Kárdex: existencia inicial, una compra y lo consumido. La resina queda en 3: justo en su mínimo.
+INSERT INTO gasto (id, fecha, monto, itbis, categoria_id, descripcion, tipo, doctor_id, metodo, proveedor_id, tipo_ncf, ncf, registrado_por)
+SELECT v.id, v.fecha::date, v.monto, v.itbis, c.id, v.descripcion, v.tipo, v.doc, v.metodo, v.prov, v.tipo_ncf, v.ncf, 1
+FROM (VALUES
+ (1,'2026-09-01',45000.00,   0.00,'Alquiler','Alquiler del local · septiembre','consultorio',NULL,'transferencia',NULL,NULL,NULL),
+ (2,'2026-09-05', 7080.00,1080.00,'Materiales e insumos','Resina y adhesivo','consultorio',NULL,'tarjeta',1,'B01','B0100004512'),
+ (3,'2026-09-30',20570.00,   0.00,'Sueldos y honorarios','Honorarios de abril · implante 36','doctor',2,'transferencia',NULL,NULL,NULL)
+) AS v(id,fecha,monto,itbis,cat,descripcion,tipo,doc,metodo,prov,tipo_ncf,ncf)
+JOIN categoria_gasto c ON c.nombre = v.cat;
+
+INSERT INTO movimiento_insumo (insumo_id, cantidad, motivo, costo_unit, gasto_id, usuario_id, ocurrido_en) VALUES
+ (1,  2, 'inicial',  2200.00, NULL, 1, '2026-01-02 08:00-04'),
+ (1,  2, 'compra',   2200.00, 2,    1, '2026-09-05 10:00-04'),
+ (1, -1, 'consumo',  NULL,    NULL, 1, '2026-09-20 16:00-04'),
+ (2,  1, 'inicial',  3200.00, NULL, 1, '2026-01-02 08:00-04'),
+ (2,  1, 'compra',   3200.00, 2,    1, '2026-09-05 10:00-04'),
+ (3,120, 'inicial',    45.00, NULL, 1, '2026-01-02 08:00-04'),
+ (3,-14, 'consumo',  NULL,    NULL, 1, '2026-09-20 16:00-04'),
+ (4,  6, 'inicial',   550.00, NULL, 1, '2026-01-02 08:00-04');
+
+-- Receta de la resina de una superficie: un décimo de jeringa, una gota de adhesivo y un cartucho.
+INSERT INTO servicio_insumo (servicio_id, insumo_id, cantidad)
+SELECT s.id, v.insumo, v.cantidad
+FROM servicio s, (VALUES (1, 0.1), (2, 0.05), (3, 1)) AS v(insumo, cantidad)
+WHERE s.codigo = 'REST-001';
 
 -- ---------------------------------------------------------------------
 -- SINCRONIZAR SECUENCIAS (por los IDs explícitos usados arriba)
@@ -305,7 +426,8 @@ DECLARE r RECORD;
 BEGIN
   FOR r IN SELECT unnest(ARRAY['sede','doctor','usuario','paciente','ficha_medica','cita','consulta',
                                'odontograma','plan_tratamiento','plan_item','procedimiento','implante',
-                               'prescripcion','factura']) AS t
+                               'prescripcion','factura','pago','unidad_dental','documento_emitido',
+                               'proveedor','insumo','gasto']) AS t
   LOOP
     EXECUTE format('SELECT setval(pg_get_serial_sequence(%L,''id''), COALESCE((SELECT MAX(id) FROM %I),1))', r.t, r.t);
   END LOOP;

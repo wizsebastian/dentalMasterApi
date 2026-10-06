@@ -5,9 +5,11 @@ from datetime import date, datetime
 from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core import tiempo
 from app.models.base import Base
 from app.models.catalogo import Alergia, CondicionMedica, enum_col
 from app.models.enums import Sexo
+from app.models.organizacion import Doctor
 
 
 class Paciente(Base):
@@ -18,8 +20,9 @@ class Paciente(Base):
     documento: Mapped[str | None] = mapped_column(Text, unique=True)
     nombres: Mapped[str] = mapped_column(Text)
     apellidos: Mapped[str] = mapped_column(Text)
-    fecha_nacimiento: Mapped[date] = mapped_column(Date)
-    sexo: Mapped[Sexo] = mapped_column(enum_col(Sexo, "sexo_t"))
+    # Opcionales: el alta rápida sólo pide nombre, y el resto se completa después.
+    fecha_nacimiento: Mapped[date | None] = mapped_column(Date)
+    sexo: Mapped[Sexo | None] = mapped_column(enum_col(Sexo, "sexo_t"))
     telefono: Mapped[str | None] = mapped_column(Text)
     celular: Mapped[str | None] = mapped_column(Text)
     email: Mapped[str | None] = mapped_column(Text)
@@ -30,6 +33,7 @@ class Paciente(Base):
     tipo_sangre: Mapped[str | None] = mapped_column(Text)
     referido_por: Mapped[str | None] = mapped_column(Text)
     sede_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("sede.id"))
+    doctor_tratante_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("doctor.id"))
     notas: Mapped[str | None] = mapped_column(Text)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -43,15 +47,22 @@ class Paciente(Base):
     ficha: Mapped["FichaMedica | None"] = relationship(
         cascade="all, delete-orphan", back_populates="paciente"
     )
+    doctor_tratante: Mapped[Doctor | None] = relationship(lazy="joined")
 
     @property
     def nombre_completo(self) -> str:
         return f"{self.nombres} {self.apellidos}"
 
     @property
-    def edad(self) -> int:
-        """Edad en años cumplidos a día de hoy."""
-        hoy = date.today()
+    def doctor_tratante_nombre(self) -> str | None:
+        return self.doctor_tratante.nombre_completo if self.doctor_tratante else None
+
+    @property
+    def edad(self) -> int | None:
+        """Edad en años cumplidos a día de hoy; None si no se conoce el nacimiento."""
+        if self.fecha_nacimiento is None:
+            return None
+        hoy = tiempo.hoy()
         cumplido = (hoy.month, hoy.day) >= (
             self.fecha_nacimiento.month,
             self.fecha_nacimiento.day,

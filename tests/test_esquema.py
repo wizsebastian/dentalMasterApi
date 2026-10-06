@@ -1,7 +1,7 @@
 """Regresión sobre la base: el esquema y los catálogos son la fundación del resto.
 
 Estas aserciones son un subconjunto de db/99_verify.sql, ejecutadas desde pytest
-para que un cambio en el modelo las rompa en CI. El reporte completo de las 79
+para que un cambio en el modelo las rompa en CI. El reporte completo de las 98
 aserciones sigue siendo `psql -f db/99_verify.sql`.
 """
 
@@ -20,8 +20,8 @@ def test_estructura_del_esquema(sql):
         "WHERE t.typtype='e' AND n.nspname='public'"
     ).scalar_one()
 
-    assert tablas == 40
-    assert vistas == 3
+    assert tablas == 56
+    assert vistas == 6
     assert enums == 13
 
 
@@ -44,6 +44,30 @@ def test_plan_item_total_es_columna_generada(sql):
         ).scalar_one()
         == "ALWAYS"
     )
+
+
+def test_procedimiento_total_es_columna_generada(sql):
+    """El cargo al paciente lo calcula la base: cantidad × precio − descuento."""
+    assert (
+        sql(
+            "SELECT is_generated FROM information_schema.columns "
+            "WHERE table_name='procedimiento' AND column_name='total'"
+        ).scalar_one()
+        == "ALWAYS"
+    )
+
+
+def test_todo_modelo_mapea_contra_el_esquema(db):
+    """Un modelo con una columna que no existe sólo fallaría al consultarlo.
+
+    Los modelos no generan el esquema, así que nada más los compara con él.
+    """
+    from sqlalchemy import select
+
+    from app.models import Base
+
+    for mapeo in Base.registry.mappers:
+        db.execute(select(mapeo.class_).limit(1)).all()
 
 
 def test_catalogo_dental_completo(sql):

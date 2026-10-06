@@ -40,13 +40,14 @@ jobs:
           psql -h localhost -U dental -d odonto -v ON_ERROR_STOP=1 -f db/init/02_seed_catalogos.sql
           psql -h localhost -U dental -d odonto -v ON_ERROR_STOP=1 -f db/dev/03_seed_demo.sql
 
-      - name: Verificación de la base (79 aserciones)
+      # El propio script termina con error si una aserción falla o si no se
+      # evaluaron todas: no hace falta buscar la palabra FAIL en la salida.
+      - name: Verificación de la base (101 aserciones)
         run: |
           export PGPASSWORD=dental
-          psql -h localhost -U dental -d odonto -f db/99_verify.sql | tee verificacion.txt
-          if grep -q "FAIL" verificacion.txt; then
-            echo "::error::La verificación de la base falló"; exit 1
-          fi
+          psql -h localhost -U dental -d odonto -f db/99_verify.sql > verificacion.txt 2>&1 \
+            || { cat verificacion.txt; echo "::error::La verificación de la base falló"; exit 1; }
+          sed -n '/RESUMEN/,$p' verificacion.txt
 
       - run: python -m app.cli db-baseline
       - run: python -m app.cli seed-users

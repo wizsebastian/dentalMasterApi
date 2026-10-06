@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.deps import BD, UsuarioAuth, requiere_rol
 from app.models.enums import RolUsuario
-from app.models.organizacion import Usuario
+from app.models.organizacion import Doctor, Usuario
 from app.models.paciente import Paciente
 from app.schemas.comun import Pagina
 from app.schemas.paciente import (
@@ -19,6 +19,8 @@ from app.schemas.paciente import (
     PacienteDetalle,
     PacienteResumen,
 )
+from app.services import correlativos
+from app.services.busqueda import coincide, coincide_digitos
 
 router = APIRouter(prefix="/pacientes", tags=["pacientes"])
 
@@ -29,36 +31,28 @@ PuedeEditar = Annotated[
 ]
 
 
-def siguiente_codigo(db: Session) -> str:
-    """Genera el número de expediente: PAC-2026-0001.
-
-    El correlativo se calcula sobre los expedientes del año en curso, así que
-    reinicia cada enero.
-    """
-    anio = datetime.now(UTC).year
-    prefijo = f"PAC-{anio}-"
-    ultimo = db.scalar(select(func.max(Paciente.codigo)).where(Paciente.codigo.like(f"{prefijo}%")))
-    consecutivo = int(ultimo.removeprefix(prefijo)) + 1 if ultimo else 1
-    return f"{prefijo}{consecutivo:04d}"
-
-
 def _filtrar(consulta: Select, buscar: str | None, incluir_inactivos: bool) -> Select:
     if not incluir_inactivos:
         consulta = consulta.where(Paciente.activo)
 
     if buscar:
-        patron = f"%{buscar.strip()}%"
-        consulta = consulta.where(
-            or_(
-                Paciente.nombres.ilike(patron),
-                Paciente.apellidos.ilike(patron),
-                Paciente.codigo.ilike(patron),
-                Paciente.documento.ilike(patron),
-                # Permite buscar "Juan Peña" aunque nombres y apellidos sean
-                # columnas distintas.
-                (Paciente.nombres + " " + Paciente.apellidos).ilike(patron),
-            )
-        )
+        condiciones = [
+            coincide(Paciente.nombres, buscar),
+            coincide(Paciente.apellidos, buscar),
+            coincide(Paciente.codigo, buscar),
+            coincide(Paciente.documento, buscar),
+            # Permite buscar "Juan Peña" aunque nombres y apellidos sean
+            # columnas distintas.
+            coincide(Paciente.nombres + " " + Paciente.apellidos, buscar),
+            coincide(Paciente.celular, buscar),
+            coincide(Paciente.telefono, buscar),
+        ]
+        # Un teléfono se encuentra por sus dígitos, escrito como se escriba.
+        for columna in (Paciente.celular, Paciente.telefono):
+            por_digitos = coincide_digitos(columna, buscar)
+            if por_digitos is not None:
+                condiciones.append(por_digitos)
+        consulta = consulta.where(or_(*condiciones))
     return consulta
 
 
@@ -66,7 +60,9 @@ def _filtrar(consulta: Select, buscar: str | None, incluir_inactivos: bool) -> S
 def listar(
     db: BD,
     _: UsuarioAuth,
-    buscar: str | None = Query(default=None, description="Nombre, expediente o documento"),
+    buscar: str | None = Query(
+        default=None, description="Nombre, expediente, documento o teléfono"
+    ),
     incluir_inactivos: bool = False,
     limite: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -98,6 +94,11 @@ def _obtener(db: Session, paciente_id: int) -> Paciente:
     return paciente
 
 
+def _exigir_doctor(db: Session, doctor_id: int | None) -> None:
+    if doctor_id is not None and db.get(Doctor, doctor_id) is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "El doctor tratante no existe")
+
+
 @router.get("/{paciente_id}", response_model=PacienteDetalle)
 def obtener(paciente_id: int, db: BD, _: UsuarioAuth) -> Paciente:
     return _obtener(db, paciente_id)
@@ -105,6 +106,7 @@ def obtener(paciente_id: int, db: BD, _: UsuarioAuth) -> Paciente:
 
 @router.post("", response_model=PacienteDetalle, status_code=status.HTTP_201_CREATED)
 def crear(datos: PacienteCrear, db: BD, _: PuedeEditar) -> Paciente:
+    _exigir_doctor(db, datos.doctor_tratante_id)
     if datos.documento and db.scalar(select(Paciente).where(Paciente.documento == datos.documento)):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -114,7 +116,7 @@ def crear(datos: PacienteCrear, db: BD, _: PuedeEditar) -> Paciente:
     ahora = datetime.now(UTC)
     paciente = Paciente(
         **datos.model_dump(exclude_none=False),
-        codigo=siguiente_codigo(db),
+        codigo=correlativos.codigo_expediente(db),
         activo=True,
         creado_en=ahora,
         actualizado_en=ahora,
@@ -130,6 +132,12 @@ def actualizar(paciente_id: int, datos: PacienteActualizar, db: BD, _: PuedeEdit
     paciente = _obtener(db, paciente_id)
 
     cambios = datos.model_dump(exclude_unset=True)
+    _exigir_doctor(db, cambios.get("doctor_tratante_id"))
+    for obligatorio in ("nombres", "apellidos"):
+        if obligatorio in cambios and cambios[obligatorio] is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, f"{obligatorio}: no puede quedar vacío"
+            )
     if "documento" in cambios and cambios["documento"]:
         duplicado = db.scalar(
             select(Paciente).where(

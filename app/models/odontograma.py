@@ -96,6 +96,14 @@ class OdontogramaHallazgo(Base):
     doctor_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("doctor.id"))
     fecha: Mapped[date] = mapped_column(Date, server_default=func.current_date())
     notas: Mapped[str | None] = mapped_column(Text)
+    # Línea ejecutada que pintó este hallazgo; NULL si se marcó a mano.
+    procedimiento_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("procedimiento.id", ondelete="SET NULL")
+    )
+    # Ítem del plan que lo propuso: así lo planificado sigue al plan y no se pierde.
+    plan_item_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("plan_item.id", ondelete="SET NULL")
+    )
 
     odontograma: Mapped[Odontograma] = relationship(back_populates="hallazgos")
     condicion: Mapped[CondicionDental] = relationship(lazy="joined")

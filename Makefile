@@ -9,17 +9,29 @@ help:  ## Muestra esta ayuda
 up:  ## Levanta el stack con datos demo
 	$(COMPOSE) up -d --build
 
+desplegar:  ## Sube la API al VPS y la levanta con Docker (ver scripts/desplegar.sh)
+	scripts/desplegar.sh
+
 down:  ## Detiene el stack (conserva los datos)
 	$(COMPOSE) down
 
 reset:  ## Recrea la base desde cero: vuelve a correr 01/02/03
 	$(COMPOSE) down -v && $(COMPOSE) up -d --build
 
+vacio:  ## Base SIN datos demo: catálogos, la clínica y un administrador (para probar creándolo todo)
+	$(COMPOSE) -f docker-compose.yml down -v
+	$(COMPOSE) -f docker-compose.yml up -d --build
+	@until curl -sf localhost:8000/health >/dev/null; do sleep 2; done
+	@$(COMPOSE) -f docker-compose.yml exec -T -e PASSWORD_INICIAL="$(or $(PASSWORD_INICIAL),Sonrisa-Prueba-7392)" api \
+	  python -m app.cli iniciar-clinica "$(or $(ADMIN),admin@dentalsonrisa.do)" "$(or $(CLINICA),Mi clínica)"
+
 logs:  ## Sigue los logs de la API
 	$(COMPOSE) logs -f api
 
-verify:  ## Ejecuta las 79 aserciones de db/99_verify.sql
-	$(COMPOSE) exec -T db psql -U dental -d odonto -f /db/99_verify.sql | tee verificacion.txt | sed -n '/RESUMEN/,$$p'
+verify:  ## Ejecuta las 101 aserciones de db/99_verify.sql; falla si alguna no pasa
+	@$(COMPOSE) exec -T db psql -U dental -d odonto -f /db/99_verify.sql > verificacion.txt 2>&1; estado=$$?; \
+	sed -n '/RESUMEN/,$$p' verificacion.txt; \
+	[ $$estado -eq 0 ] || { tail -n 5 verificacion.txt; exit $$estado; }
 
 test:  ## Corre la suite de pytest
 	$(COMPOSE) exec -T api pytest

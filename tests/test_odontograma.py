@@ -210,3 +210,29 @@ def test_borrar_un_hallazgo_mal_registrado(client, cabeceras_doctor, odontograma
 
     restantes = client.get("/api/v1/pacientes/1/odontograma", headers=cabeceras_doctor).json()
     assert creado["id"] not in [h["id"] for h in restantes["hallazgos"]]
+
+
+def test_nueva_version_conserva_la_denticion_y_al_cambiarla_no_arrastra(client, cabeceras_doctor):
+    """Sin `denticion`, la versión nueva es de la misma que la vigente; al pasar
+    de temporal a permanente no se copian hallazgos de piezas que ya no están."""
+    ruta = "/api/v1/pacientes/2/odontograma"
+    primera = client.post(
+        ruta, headers=cabeceras_doctor, json={"denticion": "temporal", "copiar_hallazgos": False}
+    )
+    assert primera.status_code == 201, primera.text
+    odontograma = primera.json()
+
+    hallazgo = client.post(
+        f"/api/v1/odontogramas/{odontograma['id']}/hallazgos",
+        headers=cabeceras_doctor,
+        json={"codigo_fdi": 55, "superficie": "O", "condicion_dental_id": 2, "estado": "existente"},
+    )
+    assert hallazgo.status_code == 201, hallazgo.text
+
+    misma = client.post(ruta, headers=cabeceras_doctor, json={}).json()
+    assert misma["denticion"] == "temporal"
+    assert len(misma["hallazgos"]) == 1
+
+    cambiada = client.post(ruta, headers=cabeceras_doctor, json={"denticion": "permanente"}).json()
+    assert cambiada["denticion"] == "permanente"
+    assert cambiada["hallazgos"] == []

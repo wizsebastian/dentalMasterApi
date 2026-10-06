@@ -13,11 +13,13 @@ from jwt import InvalidTokenError
 
 from app.core.config import settings
 
-TokenType = Literal["access", "refresh"]
+TokenType = Literal["access", "refresh", "firma"]
 
 # bcrypt trunca silenciosamente en 72 bytes; se rechaza antes para que una
 # contraseña larga no acabe validando con sólo su prefijo.
 MAX_PASSWORD_BYTES = 72
+
+MINUTOS_ENLACE_FIRMA = 120
 
 
 def hash_password(plain: str) -> str:
@@ -42,12 +44,49 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
+MIN_PASSWORD = 12
+
+
+def revisar_password(password: str) -> str | None:
+    """Devuelve el motivo de rechazo, o None si la contraseña es aceptable.
+
+    La longitud sola no basta: '12345678912345' tiene catorce caracteres y se
+    adivina al primer intento. Se rechazan secuencias, repeticiones y patrones
+    de teclado, que es justo lo que se escribe cuando el único requisito es un
+    mínimo de longitud.
+    """
+    if len(password) < MIN_PASSWORD:
+        return f"debe tener al menos {MIN_PASSWORD} caracteres"
+
+    if len(set(password)) < 5:
+        return "usa muy pocos caracteres distintos"
+
+    minuscula = password.lower()
+
+    for base in ("0123456789", "abcdefghijklmnopqrstuvwxyz"):
+        for referencia in (base, base[::-1]):
+            for inicio in range(len(referencia) - 5):
+                if referencia[inicio : inicio + 6] in minuscula:
+                    return "contiene una secuencia previsible (12345…, abcde…)"
+
+    for patron in ("qwerty", "asdfgh", "password", "contrasena", "dental", "admin"):
+        if patron in minuscula:
+            return f"contiene un patrón previsible ({patron})"
+
+    if password.isdigit():
+        return "no puede ser sólo dígitos"
+
+    return None
+
+
 def create_token(subject: str, token_type: TokenType, **claims: Any) -> str:
-    ttl = (
-        timedelta(minutes=settings.access_token_minutes)
-        if token_type == "access"
-        else timedelta(days=settings.refresh_token_days)
-    )
+    if token_type == "access":
+        ttl = timedelta(minutes=settings.access_token_minutes)
+    elif token_type == "refresh":
+        ttl = timedelta(days=settings.refresh_token_days)
+    else:
+        # El enlace para firmar un documento: sirve sólo para ese documento y caduca pronto.
+        ttl = timedelta(hours=MINUTOS_ENLACE_FIRMA / 60)
     ahora = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": subject,

@@ -1,6 +1,5 @@
 """Odontograma: versión vigente, historial y registro de hallazgos."""
 
-from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import BD, UsuarioAuth, requiere_rol
-from app.models.enums import RolUsuario
+from app.core.tiempo import hoy
+from app.models.enums import Denticion, RolUsuario
 from app.models.odontograma import Odontograma, OdontogramaDiente, OdontogramaHallazgo
 from app.models.organizacion import Usuario
 from app.models.paciente import Paciente
@@ -98,10 +98,11 @@ def nueva_version(
     """
     _exigir_paciente(db, paciente_id)
 
+    anterior = servicio.obtener_vigente(db, paciente_id)
     nueva = servicio.crear_version(
         db,
         paciente_id,
-        denticion=datos.denticion,
+        denticion=datos.denticion or (anterior.denticion if anterior else Denticion.PERMANENTE),
         doctor_id=usuario.doctor_id,
         observaciones=datos.observaciones,
         copiar_hallazgos=datos.copiar_hallazgos,
@@ -151,7 +152,7 @@ def registrar_hallazgo(
         condicion_dental_id=datos.condicion_dental_id,
         estado=datos.estado,
         doctor_id=usuario.doctor_id,
-        fecha=date.today(),
+        fecha=hoy(),
         notas=datos.notas,
     )
     db.add(hallazgo)

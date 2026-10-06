@@ -109,3 +109,59 @@ def test_alertas_del_paciente_4(client, cabeceras_doctor):
 
     assert len(alertas) == 4
     assert {a["tipo"] for a in alertas} == {"condicion", "alergia"}
+
+
+def test_alta_rapida_solo_con_nombre_y_telefono(client, cabeceras_recepcion):
+    """Recepción da de alta en el mostrador; lo demás se completa después."""
+    r = client.post(
+        RUTA,
+        json={"nombres": "Pedro", "apellidos": "Sosa", "celular": "829-555-0144"},
+        headers=cabeceras_recepcion,
+    )
+
+    assert r.status_code == 201, r.text
+    cuerpo = r.json()
+    assert cuerpo["fecha_nacimiento"] is None
+    assert cuerpo["edad"] is None
+    assert cuerpo["sexo"] is None
+    assert cuerpo["documento"] is None
+
+
+def test_un_documento_de_relleno_se_rechaza(client, cabeceras_doctor):
+    """El documento es opcional para que nadie tenga que inventarlo."""
+    for relleno in ("000000000000", "-", "n", "00000-0"):
+        r = client.post(RUTA, json={**NUEVO, "documento": relleno}, headers=cabeceras_doctor)
+        assert r.status_code == 422, relleno
+
+
+def test_la_cedula_se_guarda_con_guiones(client, cabeceras_doctor):
+    cuerpo = client.post(
+        RUTA, json={**NUEVO, "documento": "40298765431"}, headers=cabeceras_doctor
+    ).json()
+    assert cuerpo["documento"] == "402-9876543-1"
+
+    repetida = client.post(
+        RUTA, json={**NUEVO, "documento": "402-9876543-1"}, headers=cabeceras_doctor
+    )
+    assert repetida.status_code == 409
+
+
+def test_busqueda_por_telefono(client, cabeceras_recepcion):
+    cuerpo = client.get(f"{RUTA}?buscar=809-777-0001", headers=cabeceras_recepcion).json()
+    assert [p["id"] for p in cuerpo["items"]] == [1]
+
+
+def test_el_doctor_tratante_es_un_campo_no_un_sufijo_del_nombre(client, cabeceras_doctor):
+    cuerpo = client.get(f"{RUTA}/1", headers=cabeceras_doctor).json()
+    assert cuerpo["doctor_tratante_id"] == 2
+    assert cuerpo["doctor_tratante_nombre"] == "Miguel Antonio Reyes Peralta"
+
+    r = client.patch(f"{RUTA}/1", json={"doctor_tratante_id": 999}, headers=cabeceras_doctor)
+    assert r.status_code == 422
+
+
+def test_dos_altas_seguidas_llevan_expedientes_consecutivos(client, cabeceras_doctor):
+    primero = client.post(RUTA, json=NUEVO, headers=cabeceras_doctor).json()["codigo"]
+    segundo = client.post(RUTA, json=NUEVO, headers=cabeceras_doctor).json()["codigo"]
+
+    assert int(segundo.rsplit("-", 1)[1]) == int(primero.rsplit("-", 1)[1]) + 1

@@ -64,6 +64,45 @@ class EstadoCita(StrEnum):
     CANCELADA = "cancelada"
     NO_ASISTIO = "no_asistio"
 
+    @property
+    def ocupa_agenda(self) -> bool:
+        """Falso en los estados que liberan al doctor y al sillón.
+
+        Coincide con el filtro de las restricciones de exclusión de `cita`.
+        """
+        return self not in (EstadoCita.CANCELADA, EstadoCita.NO_ASISTIO)
+
+    @property
+    def siguientes(self) -> tuple["EstadoCita", ...]:
+        """A qué estados puede pasar una cita desde éste.
+
+        Una cita atendida no se mueve: ya tiene (o tendrá) una consulta colgando.
+        Cancelada y no asistió se pueden reabrir.
+        """
+        return _TRANSICIONES_CITA[self]
+
+
+_TRANSICIONES_CITA: dict[EstadoCita, tuple[EstadoCita, ...]] = {
+    EstadoCita.AGENDADA: (
+        EstadoCita.CONFIRMADA,
+        EstadoCita.EN_SALA,
+        EstadoCita.ATENDIDA,
+        EstadoCita.CANCELADA,
+        EstadoCita.NO_ASISTIO,
+    ),
+    EstadoCita.CONFIRMADA: (
+        EstadoCita.EN_SALA,
+        EstadoCita.ATENDIDA,
+        EstadoCita.CANCELADA,
+        EstadoCita.NO_ASISTIO,
+        EstadoCita.AGENDADA,
+    ),
+    EstadoCita.EN_SALA: (EstadoCita.ATENDIDA, EstadoCita.CONFIRMADA, EstadoCita.CANCELADA),
+    EstadoCita.ATENDIDA: (),
+    EstadoCita.CANCELADA: (EstadoCita.AGENDADA,),
+    EstadoCita.NO_ASISTIO: (EstadoCita.AGENDADA,),
+}
+
 
 class EstadoPlan(StrEnum):
     BORRADOR = "borrador"
@@ -72,6 +111,27 @@ class EstadoPlan(StrEnum):
     RECHAZADO = "rechazado"
     EN_EJECUCION = "en_ejecucion"
     FINALIZADO = "finalizado"
+
+    @property
+    def abierto(self) -> bool:
+        """Un plan finalizado o rechazado no admite consultas ni ítems nuevos."""
+        return self not in (EstadoPlan.FINALIZADO, EstadoPlan.RECHAZADO)
+
+    @property
+    def siguientes(self) -> tuple["EstadoPlan", ...]:
+        """A qué estados puede pasar a mano. `en_ejecucion` no está: llega solo
+        con la primera línea ejecutada."""
+        return _TRANSICIONES_PLAN[self]
+
+
+_TRANSICIONES_PLAN: dict[EstadoPlan, tuple[EstadoPlan, ...]] = {
+    EstadoPlan.BORRADOR: (EstadoPlan.PRESENTADO, EstadoPlan.ACEPTADO),
+    EstadoPlan.PRESENTADO: (EstadoPlan.ACEPTADO, EstadoPlan.RECHAZADO, EstadoPlan.BORRADOR),
+    EstadoPlan.ACEPTADO: (EstadoPlan.FINALIZADO, EstadoPlan.BORRADOR),
+    EstadoPlan.EN_EJECUCION: (EstadoPlan.FINALIZADO,),
+    EstadoPlan.RECHAZADO: (EstadoPlan.BORRADOR,),
+    EstadoPlan.FINALIZADO: (EstadoPlan.EN_EJECUCION,),
+}
 
 
 class EstadoProcedimiento(StrEnum):
@@ -91,10 +151,11 @@ class EstadoImplante(StrEnum):
 
 
 class EstadoFactura(StrEnum):
+    """La factura es el comprobante fiscal: no recibe pagos, así que no tiene
+    estados de cobro. Lo cobrado vive en `pago` y `pago_aplicacion`."""
+
     BORRADOR = "borrador"
     EMITIDA = "emitida"
-    PARCIAL = "parcial"
-    PAGADA = "pagada"
     ANULADA = "anulada"
 
 

@@ -6,20 +6,26 @@ versiones pasadas sean de solo lectura, ni que una cara exista en la pieza donde
 se registra. Eso vive aquí.
 """
 
-from datetime import date
-
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tiempo import hoy
 from app.models.catalogo import CondicionDental, Diente
 from app.models.enums import AmbitoCondicion, Denticion, EstadoHallazgo
 from app.models.odontograma import Odontograma, OdontogramaDiente, OdontogramaHallazgo
 
-# Estados que se arrastran al crear una versión nueva. Lo planificado no se
-# copia: pertenece al plan de tratamiento que lo originó, y arrastrarlo
-# duplicaría propuestas que quizá ya se descartaron.
+# Estados que se arrastran al crear una versión nueva. Lo planificado a mano no
+# se copia: arrastrarlo duplicaría propuestas que quizá ya se descartaron. Lo
+# que propuso un ítem de un plan sí viaja (`plan_item_id`), porque el plan es
+# quien lo mantiene: se quita solo cuando el ítem se quita o se ejecuta.
 ESTADOS_HEREDABLES = (EstadoHallazgo.EXISTENTE, EstadoHallazgo.COMPLETADO)
+
+
+def se_hereda(hallazgo: OdontogramaHallazgo) -> bool:
+    if hallazgo.estado in ESTADOS_HEREDABLES:
+        return True
+    return hallazgo.estado == EstadoHallazgo.PLANIFICADO and hallazgo.plan_item_id is not None
 
 
 def obtener_vigente(db: Session, paciente_id: int) -> Odontograma | None:
@@ -73,16 +79,17 @@ def crear_version(
         doctor_id=doctor_id,
         version=(anterior.version + 1) if anterior else 1,
         denticion=denticion,
-        fecha=date.today(),
+        fecha=hoy(),
         es_actual=True,
         observaciones=observaciones,
     )
     db.add(nueva)
     db.flush()
 
-    if anterior is not None and copiar_hallazgos:
+    # Al cambiar de dentición no hay nada que arrastrar: son otras piezas.
+    if anterior is not None and copiar_hallazgos and anterior.denticion == denticion:
         for previo in anterior.hallazgos:
-            if previo.estado not in ESTADOS_HEREDABLES:
+            if not se_hereda(previo):
                 continue
             db.add(
                 OdontogramaHallazgo(
@@ -94,6 +101,8 @@ def crear_version(
                     doctor_id=previo.doctor_id,
                     fecha=previo.fecha,
                     notas=previo.notas,
+                    procedimiento_id=previo.procedimiento_id,
+                    plan_item_id=previo.plan_item_id,
                 )
             )
         for previo_diente in anterior.dientes:

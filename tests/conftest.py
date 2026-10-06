@@ -19,7 +19,7 @@ def db():
     `join_transaction_mode="create_savepoint"`, de modo que los `commit()` del
     código de producción liberan un savepoint en lugar de confirmar de verdad.
     Así los tests pueden ejercitar los endpoints tal cual, sin tocar los datos
-    demo sobre los que se apoyan las 79 aserciones de db/99_verify.sql.
+    demo sobre los que se apoyan las 101 aserciones de db/99_verify.sql.
     """
     conexion = engine.connect()
     transaccion = conexion.begin()
@@ -60,6 +60,11 @@ def _token(client: TestClient, email: str, password: str = "dental2026") -> str:
 @pytest.fixture
 def cabeceras_doctor(client) -> dict[str, str]:
     return {"Authorization": f"Bearer {_token(client, 'laura.fernandez@dentalsonrisa.do')}"}
+
+
+@pytest.fixture
+def cabeceras_admin(client) -> dict[str, str]:
+    return {"Authorization": f"Bearer {_token(client, 'admin@dentalsonrisa.do')}"}
 
 
 @pytest.fixture

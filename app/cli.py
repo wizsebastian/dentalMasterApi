@@ -1,5 +1,6 @@
 """Comandos de mantenimiento. Uso: python -m app.cli <comando>"""
 
+import os
 import sys
 from getpass import getpass
 
@@ -8,10 +9,10 @@ from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from sqlalchemy import select, update
 
-from app.core.security import hash_password
+from app.core.security import hash_password, revisar_password
 from app.db.session import SessionLocal, engine
 from app.models.enums import RolUsuario
-from app.models.organizacion import Usuario
+from app.models.organizacion import Sede, Usuario
 
 # Contraseña única para todos los usuarios del seed demo. Sólo desarrollo:
 # el entrypoint sólo ejecuta seed-users cuando SEED_DEMO_USERS=true.
@@ -65,41 +66,6 @@ def seed_users() -> None:
     print(f"[cli] {len(pendientes)} usuarios con contraseña '{DEMO_PASSWORD}':")
     for email in pendientes:
         print(f"       - {email}")
-
-
-MIN_PASSWORD = 12
-
-
-def revisar_password(password: str) -> str | None:
-    """Devuelve el motivo de rechazo, o None si la contraseña es aceptable.
-
-    La longitud sola no basta: '12345678912345' tiene catorce caracteres y se
-    adivina al primer intento. Se rechazan secuencias, repeticiones y patrones
-    de teclado, que es justo lo que se escribe cuando el único requisito es un
-    mínimo de longitud.
-    """
-    if len(password) < MIN_PASSWORD:
-        return f"debe tener al menos {MIN_PASSWORD} caracteres"
-
-    if len(set(password)) < 5:
-        return "usa muy pocos caracteres distintos"
-
-    minuscula = password.lower()
-
-    for base in ("0123456789", "abcdefghijklmnopqrstuvwxyz"):
-        for referencia in (base, base[::-1]):
-            for inicio in range(len(referencia) - 5):
-                if referencia[inicio : inicio + 6] in minuscula:
-                    return "contiene una secuencia previsible (12345…, abcde…)"
-
-    for patron in ("qwerty", "asdfgh", "password", "contrasena", "dental", "admin"):
-        if patron in minuscula:
-            return f"contiene un patrón previsible ({patron})"
-
-    if password.isdigit():
-        return "no puede ser sólo dígitos"
-
-    return None
 
 
 def pedir_password() -> str:
@@ -187,10 +153,56 @@ def crear_usuario() -> None:
     print(f"[cli] usuario {email} creado con rol {rol}")
 
 
+def iniciar_clinica() -> None:
+    """Prepara una base vacía para empezar a trabajar. Uso:
+
+        python -m app.cli iniciar-clinica <email-del-administrador> ["Nombre de la clínica"]
+
+    Crea la sede (sin ella no hay clínica que poner en los impresos) y el primer
+    administrador; el resto —doctores, usuarios, unidades— se crea desde la
+    aplicación. La contraseña se pide por consola, o se toma de la variable
+    `PASSWORD_INICIAL` para poder preparar una base de pruebas sin teclado.
+    """
+    if len(sys.argv) < 3:
+        print(
+            'uso: python -m app.cli iniciar-clinica <email> ["Nombre de la clínica"]',
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    email = sys.argv[2].strip().lower()
+    nombre = sys.argv[3].strip() if len(sys.argv) > 3 else "Mi clínica"
+
+    password = os.environ.get("PASSWORD_INICIAL") or pedir_password()
+    motivo = revisar_password(password)
+    if motivo:
+        print(f"Contraseña rechazada: {motivo}", file=sys.stderr)
+        raise SystemExit(1)
+
+    with SessionLocal() as db:
+        if db.scalar(select(Usuario).where(Usuario.email == email)):
+            print(f"Ya existe un usuario con el email {email}", file=sys.stderr)
+            raise SystemExit(1)
+        if db.scalar(select(Sede.id).limit(1)) is None:
+            db.add(Sede(nombre=nombre))
+        db.add(
+            Usuario(
+                email=email,
+                password_hash=hash_password(password),
+                rol=RolUsuario.ADMIN,
+                activo=True,
+            )
+        )
+        db.commit()
+
+    print(f"[cli] clínica «{nombre}» lista; administrador {email}")
+
+
 COMMANDS = {
     "db-baseline": db_baseline,
     "seed-users": seed_users,
     "crear-usuario": crear_usuario,
+    "iniciar-clinica": iniciar_clinica,
     "cambiar-password": cambiar_password,
 }
 

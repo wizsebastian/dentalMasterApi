@@ -5,6 +5,7 @@ aplicación: alimentan el odontograma y no se editan en runtime.
 """
 
 from sqlalchemy import CHAR, BigInteger, Boolean, Enum, Integer, SmallInteger, Text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -89,3 +90,5 @@ class Alergia(Base):
     codigo: Mapped[str] = mapped_column(Text, unique=True)
     nombre: Mapped[str] = mapped_column(Text)
     tipo: Mapped[str | None] = mapped_column(Text)
+    # Nombres que delatan la alergia en una receta: «amoxicilina» para la penicilina.
+    palabras_clave: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)

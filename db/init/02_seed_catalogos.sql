@@ -38,25 +38,25 @@ INSERT INTO condicion_medica (codigo, nombre, riesgo, alerta) VALUES
 -- ---------------------------------------------------------------------
 -- ALERGIAS
 -- ---------------------------------------------------------------------
-INSERT INTO alergia (codigo, nombre, tipo) VALUES
- ('PENI','Penicilina','medicamento'),
- ('AINE','AINEs / Aspirina','medicamento'),
- ('SULF','Sulfamidas','medicamento'),
- ('LIDO','Lidocaína / anestésicos locales','medicamento'),
- ('LATEX','Látex','material'),
- ('NIQ','Níquel / metales','material'),
- ('YODO','Yodo / povidona','medicamento'),
- ('ACRIL','Acrílico','material');
+INSERT INTO alergia (codigo, nombre, tipo, palabras_clave) VALUES
+ ('PENI','Penicilina','medicamento','{penicilina,amoxicilina,ampicilina,amoxi,augmentin,clavulan,dicloxacilina}'),
+ ('AINE','AINEs / Aspirina','medicamento','{aspirina,ibuprofeno,naproxeno,diclofenaco,ketorolaco,ketoprofeno,meloxicam,acetilsalicilico}'),
+ ('SULF','Sulfamidas','medicamento','{sulfa,sulfametoxazol,trimetoprim,bactrim,cotrimoxazol}'),
+ ('LIDO','Lidocaína / anestésicos locales','medicamento','{lidocaina,articaina,mepivacaina,benzocaina,prilocaina}'),
+ ('LATEX','Látex','material','{latex}'),
+ ('NIQ','Níquel / metales','material','{niquel}'),
+ ('YODO','Yodo / povidona','medicamento','{yodo,povidona,isodine}'),
+ ('ACRIL','Acrílico','material','{acrilico}');
 
 -- ---------------------------------------------------------------------
 -- ASEGURADORAS
 -- ---------------------------------------------------------------------
 INSERT INTO aseguradora (codigo, nombre, telefono) VALUES
  ('PARTIC','Particular / sin seguro', NULL),
- ('ARS01','ARS Humano','809-000-0001'),
- ('ARS02','ARS Universal','809-000-0002'),
- ('ARS03','ARS Palic Salud','809-000-0003'),
- ('ARS04','SeNaSa','809-000-0004');
+ ('ARS01','ARS Humano','(809) 000-0001'),
+ ('ARS02','ARS Universal','(809) 000-0002'),
+ ('ARS03','ARS Palic Salud','(809) 000-0003'),
+ ('ARS04','SeNaSa','(809) 000-0004');
 
 -- ---------------------------------------------------------------------
 -- DIENTES · Notación FDI/ISO 3950 (32 permanentes + 20 temporales)
@@ -287,3 +287,84 @@ INSERT INTO sistema_implante (marca, linea, conexion, proveedor) VALUES
  ('Neodent','Grand Morse','Cono morse','Distribuidor local'),
  ('MIS','C1','Hexágono interno','Distribuidor local'),
  ('BioHorizons','Tapered Pro','Hexágono interno','Distribuidor local');
+
+-- ---------------------------------------------------------------------
+-- PLANTILLAS DE DOCUMENTO
+-- Las variables {{...}} se combinan al emitir; el texto final es editable.
+-- ---------------------------------------------------------------------
+INSERT INTO plantilla_documento (codigo, tipo, titulo, cuerpo, requiere_firma) VALUES
+ ('CONST-VISITA','constancia','Constancia de visita',
+  E'Por medio de la presente se hace constar que el/la paciente {{paciente.nombre}}, portador(a) de la cédula {{paciente.documento}}, asistió a consulta odontológica en {{clinica.nombre}} el día {{consulta.fecha}}.
+
+Procedimiento realizado: {{consulta.servicios}}.
+Atendido(a) por: {{doctor.nombre}}.
+
+Se emite la presente constancia a solicitud del interesado para los fines que estime convenientes.',
+  FALSE),
+ ('LICENCIA','licencia','Licencia médica',
+  E'Quien suscribe, {{doctor.nombre}}, certifica que el/la paciente {{paciente.nombre}}, portador(a) de la cédula {{paciente.documento}}, fue atendido(a) el día {{consulta.fecha}} por: {{consulta.servicios}}.
+
+Se recomienda reposo por ___ día(s) a partir de la fecha.
+
+Se expide la presente en {{clinica.ciudad}}, el {{fecha}}.',
+  FALSE),
+ ('POSTOP-GENERAL','postoperatorio','Cuidados postoperatorios',
+  E'Indicaciones para {{paciente.nombre}} tras: {{consulta.servicios}}.
+
+• Muerda la gasa durante 30 minutos y no escupa ni se enjuague hoy.
+• Aplique hielo por fuera, 10 minutos sí y 10 no, durante las primeras horas.
+• Dieta blanda y fría el primer día. No fume ni tome alcohol por 72 horas.
+• Tome la medicación tal como se le indicó.
+• Cepille con suavidad, sin tocar la zona, a partir de mañana.
+
+Llame a {{clinica.nombre}} ({{clinica.telefono}}) si hay sangrado que no cede, fiebre o dolor que aumenta después del tercer día.',
+  FALSE),
+ ('CONS-GENERAL','consentimiento','Consentimiento informado',
+  E'Yo, {{paciente.nombre}}, portador(a) de la cédula {{paciente.documento}}, autorizo a {{doctor.nombre}} y a su equipo a realizar el tratamiento que se me ha explicado: {{plan.titulo}}.
+
+He sido informado(a) de su naturaleza, sus beneficios, sus riesgos y las alternativas, y he podido hacer las preguntas que he considerado necesarias. Entiendo que puedo retirar este consentimiento en cualquier momento antes del procedimiento.
+
+{{clinica.ciudad}}, {{fecha}}.',
+  TRUE),
+ ('CONS-IMPLANTE','consentimiento','Consentimiento informado · Implante dental',
+  E'Yo, {{paciente.nombre}}, portador(a) de la cédula {{paciente.documento}}, autorizo a {{doctor.nombre}} a colocarme uno o más implantes dentales.
+
+He sido informado(a) de que:
+• Un implante puede no integrarse al hueso y requerir su retiro.
+• Fumar, la diabetes no controlada y la mala higiene aumentan ese riesgo.
+• Puede haber inflamación, dolor, hematoma y, raramente, alteración de la sensibilidad.
+• El tratamiento requiere controles y una prótesis posterior, que tiene un costo aparte.
+
+He podido hacer preguntas y se me han respondido.
+
+{{clinica.ciudad}}, {{fecha}}.',
+  TRUE),
+ ('CONS-DATOS','consentimiento_datos','Consentimiento de tratamiento de datos personales',
+  E'Yo, {{paciente.nombre}}, portador(a) de la cédula {{paciente.documento}}, autorizo a {{clinica.nombre}} a registrar y conservar mis datos personales y de salud con el fin de prestarme atención odontológica, llevar mi historia clínica y contactarme sobre mis citas y tratamientos.
+
+Mis datos no se cederán a terceros sin mi autorización, salvo obligación legal. Puedo solicitar su consulta, corrección o supresión dirigiéndome a la clínica.
+
+{{clinica.ciudad}}, {{fecha}}.',
+  TRUE);
+
+-- ---------------------------------------------------------------------
+-- CATEGORÍAS DE GASTO Y DE INSUMO
+-- ---------------------------------------------------------------------
+INSERT INTO categoria_gasto (nombre) VALUES
+ ('Alquiler'),
+ ('Servicios (luz, agua, internet)'),
+ ('Sueldos y honorarios'),
+ ('Materiales e insumos'),
+ ('Laboratorio dental'),
+ ('Mantenimiento y equipos'),
+ ('Impuestos y tasas'),
+ ('Otros');
+
+INSERT INTO categoria_insumo (nombre) VALUES
+ ('Anestesia'),
+ ('Restauración'),
+ ('Endodoncia'),
+ ('Descartables'),
+ ('Esterilización'),
+ ('Laboratorio externo');
+
