@@ -50,10 +50,29 @@ scripts/desplegar.sh --simular        # enseña qué subiría, sin tocar nada
 scripts/desplegar.sh --reiniciar-base # destruye base y almacén (pide escribir BORRAR)
 ```
 
-El script sólo toca `~/projects/dentalmaster-api` y los contenedores de este proyecto, nunca
-sube el `.env` (vive en el servidor) y no usa `docker-compose.override.yml`. Espera a que
-`/health` responda en `:8002` y, si no lo hace, muestra los registros de la API. Se puede
-apuntar a otro servidor con `SERVIDOR=` y `DESTINO=`. A mano sería:
+El script sube el código por `rsync`, nunca por `git pull`: el servidor no necesita acceso al
+repositorio. Sólo toca `~/projects/dentalmaster-api` y los contenedores de este proyecto, y no
+usa `docker-compose.override.yml`. Espera a que `/health` responda en `:8002` y, si no lo hace,
+muestra los registros de la API. Se puede apuntar a otro servidor con `SERVIDOR=` y `DESTINO=`.
+
+**Primer arranque:** si no existe `~/projects/dentalmaster-api/.env` en el servidor, el script lo
+genera ahí mismo (`POSTGRES_PASSWORD` y `SECRET_KEY` aleatorios, nunca en este repo) y, una vez
+que la API responde, da de alta a los dos administradores con contraseñas también aleatorias:
+
+| Correo | Rol |
+|---|---|
+| `admin@drgabrielmartinez.com` | administración de la clínica |
+| `wizsebastian@gmail.com` | mantenimiento técnico — usuario `admin` normal, con su propio rastro de sesión como cualquier cuenta; no aparece en los informes de producción porque esos sólo cuentan doctores |
+
+Las contraseñas quedan en `credenciales-AAAAMMDD-HHMMSS.txt`, en este directorio, fuera del
+control de versiones (`.gitignore`). Guárdalas en un gestor de contraseñas y borra el archivo.
+Para rotar cualquiera de las dos después:
+
+```bash
+ssh -t deploy@74.208.173.175 'cd ~/projects/dentalmaster-api && docker compose -f docker-compose.prod.yml exec api python -m app.cli cambiar-password <correo>'
+```
+
+A mano, sin el script, sería:
 
 ```bash
 ssh deploy@74.208.173.175
