@@ -42,7 +42,11 @@ cd "$(dirname "$0")/.."
 [ -f docker-compose.prod.yml ] || { echo "Ejecútalo desde dentalMasterApi/." >&2; exit 1; }
 
 paso() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
-remoto() { ssh -o BatchMode=yes "$SERVIDOR" "$@"; }
+# -n: no leer la entrada estándar del script (si no, un `ssh` de paso se come
+# la confirmación «BORRAR» antes de que llegue al `read`). El único comando que
+# sí necesita entrada (crear-usuario, para la contraseña) usa `remoto_con_entrada`.
+remoto() { ssh -o BatchMode=yes -n "$SERVIDOR" "$@"; }
+remoto_con_entrada() { ssh -o BatchMode=yes "$SERVIDOR" "$@"; }
 
 paso "Comprobando acceso a $SERVIDOR"
 remoto "docker compose version" >/dev/null \
@@ -65,6 +69,14 @@ if [ "$SIMULAR" -eq 1 ]; then
   echo; echo "Simulación: no se subió nada ni se tocó Docker."
   exit 0
 fi
+
+# Este Mac trae `openrsync`, no GNU rsync: --chmod no tiene efecto ahí y deja
+# algunos archivos en 600 (umask heredado). Sin este arreglo llegan ilegibles
+# para el usuario de Postgres dentro del contenedor, y db/init/*.sql falla en
+# silencio con «Permission denied» sin crear ninguna tabla. Nunca toca .env.
+paso "Corrigiendo permisos en el servidor"
+remoto "find ~/$DESTINO -type d -exec chmod u+rwx,go+rx-w {} + \
+  && find ~/$DESTINO -type f ! -name .env -exec chmod u+rw,go+r-w {} +"
 
 PRIMER_ARRANQUE=0
 if ! remoto "test -s ~/$DESTINO/.env"; then
@@ -128,7 +140,7 @@ if [ "$PRIMER_ARRANQUE" -eq 1 ]; then
   remoto "cd ~/$DESTINO && $COMPOSE exec -T -e PASSWORD_INICIAL='$PASS_CLINICA' api \
     python -m app.cli iniciar-clinica '$ADMIN_CLINICA' 'Dr. Gabriel Martínez'"
 
-  remoto "cd ~/$DESTINO && $COMPOSE exec -T api python -m app.cli crear-usuario \
+  remoto_con_entrada "cd ~/$DESTINO && $COMPOSE exec -T api python -m app.cli crear-usuario \
     '$ADMIN_MANTENIMIENTO' admin" <<< "$PASS_MANTENIMIENTO"$'\n'"$PASS_MANTENIMIENTO"
 
   CREDENCIALES="credenciales-$(date +%Y%m%d-%H%M%S).txt"
