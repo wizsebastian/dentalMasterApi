@@ -24,6 +24,7 @@ from app.models.documento import (
     Prescripcion,
     PrescripcionItem,
 )
+from app.models.guia import GuiaEvento, GuiaRespuesta, GuiaSesion
 from app.models.implante import Implante, ImplanteEvento, SistemaImplante
 from app.models.inventario import (
     CategoriaGasto,
@@ -77,6 +78,9 @@ __all__ = [
     "DocumentoEmitido",
     "Firma",
     "Gasto",
+    "GuiaEvento",
+    "GuiaRespuesta",
+    "GuiaSesion",
     "Insumo",
     "MovimientoInsumo",
     "PlantillaDocumento",

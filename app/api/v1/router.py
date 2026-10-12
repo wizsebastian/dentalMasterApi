@@ -12,6 +12,7 @@ from app.api.v1.routers import (
     documentos,
     ficha,
     fiscal,
+    guia,
     historial,
     implantes,
     informes,
@@ -45,3 +46,4 @@ api_router.include_router(onboarding.router)
 api_router.include_router(servicios.router)
 api_router.include_router(clinica.router)
 api_router.include_router(usuarios.router)
+api_router.include_router(guia.router)

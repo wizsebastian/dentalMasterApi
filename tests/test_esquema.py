@@ -10,7 +10,7 @@ def test_estructura_del_esquema(sql):
     tablas = sql(
         "SELECT count(*) FROM information_schema.tables "
         "WHERE table_schema='public' AND table_type='BASE TABLE' "
-        "AND table_name <> 'alembic_version'"
+        "AND table_name <> 'alembic_version' AND table_name NOT LIKE 'guia\\_%'"
     ).scalar_one()
     vistas = sql(
         "SELECT count(*) FROM information_schema.views WHERE table_schema='public'"

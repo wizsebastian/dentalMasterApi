@@ -26,9 +26,11 @@ INSERT INTO _chk VALUES
 ('C-01','estructura','Tablas base del dominio en public','56',
  -- alembic_version queda fuera: es infraestructura de migraciones, no del
  -- modelo clínico, y sólo existe una vez que la API ancla el baseline.
+ -- Las guia_* las crea la migración 0002 (guía interactiva), no el esquema base.
  (SELECT count(*)::text FROM information_schema.tables
    WHERE table_schema='public' AND table_type='BASE TABLE'
-     AND table_name <> 'alembic_version')),
+     AND table_name <> 'alembic_version'
+     AND table_name NOT LIKE 'guia\_%')),
 ('C-02','estructura','Vistas creadas','6',
  (SELECT count(*)::text FROM information_schema.views WHERE table_schema='public')),
 ('C-03','estructura','Tipos ENUM creados','13',
